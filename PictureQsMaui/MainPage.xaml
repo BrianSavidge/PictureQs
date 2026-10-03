@@ -1,0 +1,61 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="PictureQsMaui.MainPage"
+             x:Name="PageRoot"
+             Title="PictureQs">
+
+    <Grid Padding="12" ColumnSpacing="12">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="260" />
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0"
+                Stroke="#D0D0D0"
+                StrokeThickness="1"
+                Padding="6">
+            <Grid>
+                <Image x:Name="PictureImage"
+                       Aspect="AspectFit"
+                       BackgroundColor="Black"
+                       SizeChanged="OnPictureSizeChanged" />
+
+                <GraphicsView x:Name="MarkerOverlay"
+                              InputTransparent="False" />
+            </Grid>
+        </Border>
+
+        <VerticalStackLayout Grid.Column="1" Spacing="8">
+            <Label Text="Points of interest"
+                   FontAttributes="Bold"
+                   FontSize="18" />
+
+            <CollectionView x:Name="PoiListView"
+                            SelectionMode="Single"
+                            SelectionChanged="OnPoiSelected">
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <SwipeView>
+                            <SwipeView.RightItems>
+                                <SwipeItems Mode="Reveal">
+                                    <SwipeItem Text="Delete"
+                                               BackgroundColor="DarkRed"
+                                               Command="{Binding Source={x:Reference PageRoot}, Path=DeletePoiCommand}"
+                                               CommandParameter="{Binding .}" />
+                                </SwipeItems>
+                            </SwipeView.RightItems>
+
+                            <Grid Padding="12,10">
+                                <Label
+                                       Text="{Binding .}"
+                                       VerticalOptions="Center" />
+                            </Grid>
+                        </SwipeView>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </VerticalStackLayout>
+    </Grid>
+
+</ContentPage>
