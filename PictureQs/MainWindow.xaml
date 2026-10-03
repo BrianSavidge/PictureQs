@@ -1,0 +1,25 @@
+<Window x:Class="PictureQs.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="PictureQs" Height="450" Width="800"
+        ResizeMode="CanResize">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="2*"/>
+            <ColumnDefinition Width="1*"/>
+        </Grid.ColumnDefinitions>
+
+        <Grid x:Name="ImagePanel">
+            <Image x:Name="ImageControl"
+                   Stretch="Uniform"
+                   MouseRightButtonDown="ImageControl_MouseRightButtonDown"
+                   SizeChanged="ImageControl_SizeChanged"/>
+            <Canvas x:Name="MarkerCanvas"
+                    IsHitTestVisible="False"/>
+        </Grid>
+
+        <ListBox x:Name="PoiListView"
+                 Grid.Column="1"
+                 SelectionChanged="PoiListView_SelectionChanged"/>
+    </Grid>
+</Window>
