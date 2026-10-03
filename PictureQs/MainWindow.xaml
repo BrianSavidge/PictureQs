@@ -20,6 +20,7 @@
 
         <ListBox x:Name="PoiListView"
                  Grid.Column="1"
-                 SelectionChanged="PoiListView_SelectionChanged"/>
+                 SelectionChanged="PoiListView_SelectionChanged"
+                 PreviewMouseRightButtonDown="PoiListView_PreviewMouseRightButtonDown"/>
     </Grid>
 </Window>

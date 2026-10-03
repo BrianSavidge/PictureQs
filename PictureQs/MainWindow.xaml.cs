@@ -16,8 +16,9 @@ namespace PictureQs
 {
     public partial class MainWindow : Window
     {
-        private static readonly string ImagePath = ResolveImagePath();
-        private static readonly string PoiFilePath = System.IO.Path.Combine(AppContext.BaseDirectory, "poi.json");
+        private static readonly string AppDataFolder = AppContext.BaseDirectory;
+        private static readonly string ImagePath = System.IO.Path.Combine(AppDataFolder, "picture.png");
+        private static readonly string PoiFilePath = System.IO.Path.Combine(AppDataFolder, "poi.json");
         private List<PointOfInterest> pointsOfInterest = new();
 
         public MainWindow()
@@ -27,15 +28,13 @@ namespace PictureQs
             LoadPointsOfInterest();
         }
 
-        private static string ResolveImagePath()
-        {
-            var candidate = System.IO.Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "picture.png");
-            var fullPath = System.IO.Path.GetFullPath(candidate);
-            return File.Exists(fullPath) ? fullPath : "picture.png";
-        }
-
         private void LoadImage()
         {
+            if (!File.Exists(ImagePath))
+            {
+                return;
+            }
+
             var imageUri = new Uri(ImagePath, UriKind.Absolute);
             var bitmap = new BitmapImage(imageUri);
             ImageControl.Source = bitmap;
@@ -57,7 +56,12 @@ namespace PictureQs
 
         private void UpdatePoiList()
         {
-            PoiListView.ItemsSource = pointsOfInterest.Select(poi => poi.Text).ToList();
+            var sortedItems = pointsOfInterest
+                .Select(poi => poi.Text)
+                .OrderBy(text => text, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            PoiListView.ItemsSource = sortedItems;
         }
 
         private void ImageControl_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
@@ -91,7 +95,12 @@ namespace PictureQs
 
         private void SavePointsOfInterest()
         {
-            var json = JsonSerializer.Serialize(pointsOfInterest);
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true
+            };
+
+            var json = JsonSerializer.Serialize(pointsOfInterest, options);
             File.WriteAllText(PoiFilePath, json);
         }
 
@@ -109,6 +118,46 @@ namespace PictureQs
             {
                 MarkerCanvas.Children.Clear();
             }
+        }
+
+        private void PoiListView_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var clickedElement = (DependencyObject)e.OriginalSource;
+            var listItem = FindAncestor<ListBoxItem>(clickedElement);
+
+            var selectedText = listItem?.Content as string;
+            if (string.IsNullOrWhiteSpace(selectedText))
+            {
+                return;
+            }
+
+            var confirm = MessageBox.Show($"Delete '{selectedText}'?", "Confirm Delete", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (confirm == MessageBoxResult.Yes)
+            {
+                var poiToRemove = pointsOfInterest.FirstOrDefault(p => p.Text == selectedText);
+                if (poiToRemove != null)
+                {
+                    pointsOfInterest.Remove(poiToRemove);
+                    SavePointsOfInterest();
+                    UpdatePoiList();
+                    MarkerCanvas.Children.Clear();
+                }
+            }
+        }
+
+        private static T? FindAncestor<T>(DependencyObject current) where T : class
+        {
+            while (current != null)
+            {
+                if (current is T match)
+                {
+                    return match;
+                }
+
+                current = VisualTreeHelper.GetParent(current);
+            }
+
+            return null;
         }
 
         private void ImageControl_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -129,20 +178,46 @@ namespace PictureQs
         private void RenderSelectedPoiMarker(PointOfInterest poi)
         {
             var imageRect = GetImageRenderRectangle();
-            if (imageRect.Width <= 0 || imageRect.Height <= 0)
+            if (double.IsNaN(imageRect.Left) || double.IsNaN(imageRect.Top) ||
+                double.IsNaN(imageRect.Width) || double.IsNaN(imageRect.Height) ||
+                imageRect.Width <= 0 || imageRect.Height <= 0)
             {
+                MarkerCanvas.Children.Clear();
                 return;
             }
 
-            var x = Math.Clamp(imageRect.Left + (poi.XPercent * imageRect.Width), imageRect.Left + 24, imageRect.Right - 24);
-            var y = Math.Clamp(imageRect.Top + ((1 - poi.YPercent) * imageRect.Height), imageRect.Top + 24, imageRect.Bottom - 24);
+            var maxX = Math.Max(0, imageRect.Right - 24);
+            var maxY = Math.Max(0, imageRect.Bottom - 24);
+            var minX = Math.Min(imageRect.Left + 24, maxX);
+            var minY = Math.Min(imageRect.Top + 24, maxY);
+
+            var x = Math.Clamp(imageRect.Left + (poi.XPercent * imageRect.Width), minX, maxX);
+            var y = Math.Clamp(imageRect.Top + ((1 - poi.YPercent) * imageRect.Height), minY, maxY);
 
             MarkerCanvas.Children.Clear();
+
+            var arrowHeight = 56.0;
+            if (imageRect.Height < arrowHeight + 18 || imageRect.Width < 40 || double.IsInfinity(x) || double.IsInfinity(y))
+            {
+                var dot = new Ellipse
+                {
+                    Width = 8,
+                    Height = 8,
+                    Fill = Brushes.Red,
+                    Stroke = Brushes.DarkRed,
+                    StrokeThickness = 1
+                };
+
+                Canvas.SetLeft(dot, x - 4);
+                Canvas.SetTop(dot, y - 4);
+                MarkerCanvas.Children.Add(dot);
+                return;
+            }
 
             var line = new Line
             {
                 X1 = x,
-                Y1 = y - 56,
+                Y1 = y - arrowHeight,
                 X2 = x,
                 Y2 = y,
                 Stroke = Brushes.Red,
@@ -273,6 +348,12 @@ namespace PictureQs
             stackPanel.Children.Add(inputTextBox);
             stackPanel.Children.Add(buttonPanel);
             Content = stackPanel;
+
+            Loaded += (_, __) =>
+            {
+                inputTextBox.Focus();
+                inputTextBox.SelectAll();
+            };
         }
 
         public string InputText { get; private set; } = string.Empty;
