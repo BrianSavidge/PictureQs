@@ -168,6 +168,14 @@ public partial class MainPage : ContentPage
         PoiListView.SelectedItem = null;
     }
 
+    private async void OnPoiDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is BindableObject { BindingContext: string selectedText })
+        {
+            await DeletePoiAsync(selectedText);
+        }
+    }
+
     private void OnPoiSelected(object? sender, SelectionChangedEventArgs e)
     {
         if (e.CurrentSelection.FirstOrDefault() is not string selectedText)

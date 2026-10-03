@@ -47,6 +47,10 @@
                             </SwipeView.RightItems>
 
                             <Grid Padding="12,10">
+                                <Grid.GestureRecognizers>
+                                    <TapGestureRecognizer NumberOfTapsRequired="2"
+                                                          Tapped="OnPoiDoubleTapped" />
+                                </Grid.GestureRecognizers>
                                 <Label
                                        Text="{Binding .}"
                                        VerticalOptions="Center" />
