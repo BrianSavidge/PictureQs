@@ -12,7 +12,10 @@ public partial class MainPage : ContentPage
     private readonly PictureLibraryService _pictureLibrary = new();
     private readonly ArrowDrawable _arrowDrawable = new();
     private string _activePictureFileName = "picture.png";
+    private PointOfInterest? _randomPoi;
     private PointOfInterest? _selectedPoi;
+    private bool _isRandomMode;
+    private bool _isUpdatingPoiList;
     private int _imagePixelWidth;
     private int _imagePixelHeight;
 
@@ -20,7 +23,7 @@ public partial class MainPage : ContentPage
 
     public MainPage()
     {
-        DeletePoiCommand = new Command<string>(async text => await DeletePoiAsync(text));
+        DeletePoiCommand = new Command<PointOfInterest>(async poi => await DeletePoiAsync(poi));
         InitializeComponent();
         MarkerOverlay.Drawable = _arrowDrawable;
 
@@ -80,6 +83,7 @@ public partial class MainPage : ContentPage
     private void LoadPointsOfInterest()
     {
         _pointsOfInterest.Clear();
+        _randomPoi = null;
         var poiFilePath = _pictureLibrary.GetTargetsPath(_activePictureFileName);
         if (File.Exists(poiFilePath))
         {
@@ -126,10 +130,91 @@ public partial class MainPage : ContentPage
     {
         var sorted = _pointsOfInterest
             .OrderBy(p => p.Text, StringComparer.OrdinalIgnoreCase)
-            .Select(p => p.Text)
             .ToList();
 
-        PoiListView.ItemsSource = sorted;
+        if (_isRandomMode)
+        {
+            if (_randomPoi is null || !sorted.Contains(_randomPoi))
+            {
+                _randomPoi = SelectRandomPoi(sorted, null);
+            }
+        }
+
+        var selectedPoi = _isRandomMode ? null : _selectedPoi;
+        RandomButton.IsEnabled = sorted.Count > 1;
+        _isUpdatingPoiList = true;
+        try
+        {
+            PoiListView.ItemsSource = _isRandomMode
+                ? _randomPoi is null ? Array.Empty<PointOfInterest>() : new[] { _randomPoi }
+                : sorted;
+            PoiListView.SelectedItem = selectedPoi;
+        }
+        finally
+        {
+            _isUpdatingPoiList = false;
+        }
+
+        if (selectedPoi is null)
+        {
+            _selectedPoi = null;
+            _arrowDrawable.SelectedPoi = null;
+            MarkerOverlay.Invalidate();
+        }
+        else
+        {
+            SelectPoi(selectedPoi);
+        }
+    }
+
+    private void OnViewClicked(object? sender, EventArgs e)
+    {
+        _isRandomMode = !_isRandomMode;
+        RandomButton.IsVisible = _isRandomMode;
+        if (_isRandomMode)
+        {
+            _randomPoi = SelectRandomPoi(
+                _pointsOfInterest.OrderBy(poi => poi.Text, StringComparer.OrdinalIgnoreCase).ToList(),
+                null);
+        }
+
+        UpdatePoiList();
+    }
+
+    private void OnRandomClicked(object? sender, EventArgs e)
+    {
+        var sorted = _pointsOfInterest
+            .OrderBy(poi => poi.Text, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        _randomPoi = SelectRandomPoi(sorted, _randomPoi);
+        UpdatePoiList();
+    }
+
+    private static PointOfInterest? SelectRandomPoi(
+        IReadOnlyList<PointOfInterest> pointsOfInterest,
+        PointOfInterest? currentPoi)
+    {
+        if (pointsOfInterest.Count == 0)
+        {
+            return null;
+        }
+
+        var currentIndex = currentPoi is null
+            ? -1
+            : pointsOfInterest.ToList().IndexOf(currentPoi);
+        if (pointsOfInterest.Count == 1 || currentIndex < 0)
+        {
+            return pointsOfInterest[Random.Shared.Next(pointsOfInterest.Count)];
+        }
+
+        var nextIndex = Random.Shared.Next(pointsOfInterest.Count - 1);
+        if (nextIndex >= currentIndex)
+        {
+            nextIndex++;
+        }
+
+        return pointsOfInterest[nextIndex];
     }
 
     private void OnPictureSizeChanged(object? sender, EventArgs e)
@@ -176,49 +261,56 @@ public partial class MainPage : ContentPage
 
         _pointsOfInterest.Add(poi);
         SavePointsOfInterest();
+        if (!_isRandomMode)
+        {
+            SelectPoi(poi);
+        }
+
         UpdatePoiList();
-        SelectPoi(poi);
     }
 
-    private async Task DeletePoiAsync(string? selectedText)
+    private async Task DeletePoiAsync(PointOfInterest? poiToRemove)
     {
-        if (string.IsNullOrWhiteSpace(selectedText))
-        {
-            return;
-        }
-
-        var shouldDelete = await DisplayAlertAsync("Delete point", $"Delete '{selectedText}'?", "Yes", "No");
-        if (!shouldDelete)
-        {
-            return;
-        }
-
-        var poiToRemove = _pointsOfInterest.FirstOrDefault(p => p.Text == selectedText);
         if (poiToRemove is null)
+        {
+            return;
+        }
+
+        var shouldDelete = await DisplayAlertAsync("Delete point", $"Delete '{poiToRemove.Text}'?", "Yes", "No");
+        if (!shouldDelete)
         {
             return;
         }
 
         _pointsOfInterest.Remove(poiToRemove);
         SavePointsOfInterest();
-        UpdatePoiList();
         _selectedPoi = null;
         _arrowDrawable.SelectedPoi = null;
+        if (_randomPoi == poiToRemove)
+        {
+            _randomPoi = null;
+        }
+
         MarkerOverlay.Invalidate();
-        PoiListView.SelectedItem = null;
+        UpdatePoiList();
     }
 
     private async void OnPoiDoubleTapped(object? sender, TappedEventArgs e)
     {
-        if (sender is BindableObject { BindingContext: string selectedText })
+        if (sender is BindableObject { BindingContext: PointOfInterest poi })
         {
-            await DeletePoiAsync(selectedText);
+            await DeletePoiAsync(poi);
         }
     }
 
     private void OnPoiSelected(object? sender, SelectionChangedEventArgs e)
     {
-        if (e.CurrentSelection.FirstOrDefault() is not string selectedText)
+        if (_isUpdatingPoiList)
+        {
+            return;
+        }
+
+        if (e.CurrentSelection.FirstOrDefault() is not PointOfInterest selectedPoi)
         {
             _selectedPoi = null;
             _arrowDrawable.SelectedPoi = null;
@@ -226,13 +318,7 @@ public partial class MainPage : ContentPage
             return;
         }
 
-        var foundPoi = _pointsOfInterest.FirstOrDefault(p => p.Text == selectedText);
-        if (foundPoi is null)
-        {
-            return;
-        }
-
-        SelectPoi(foundPoi);
+        SelectPoi(selectedPoi);
     }
 
     private void SelectPoi(PointOfInterest poi)
