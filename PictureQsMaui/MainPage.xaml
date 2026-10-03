@@ -26,12 +26,15 @@
             </Grid>
         </Border>
 
-        <VerticalStackLayout Grid.Column="1" Spacing="8">
+        <Grid Grid.Column="1"
+              RowDefinitions="Auto,*,Auto"
+              RowSpacing="8">
             <Label Text="Points of interest"
                    FontAttributes="Bold"
                    FontSize="18" />
 
-            <CollectionView x:Name="PoiListView"
+            <CollectionView Grid.Row="1"
+                            x:Name="PoiListView"
                             SelectionMode="Single"
                             SelectionChanged="OnPoiSelected">
                 <CollectionView.ItemTemplate>
@@ -59,7 +62,11 @@
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
             </CollectionView>
-        </VerticalStackLayout>
+
+            <Button Grid.Row="2"
+                    Text="Pictures"
+                    Clicked="OnPicturesClicked" />
+        </Grid>
     </Grid>
 
 </ContentPage>

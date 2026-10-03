@@ -2,15 +2,16 @@ using System.Buffers.Binary;
 using System.Text.Json;
 using System.Windows.Input;
 using PictureQsMaui.Models;
+using PictureQsMaui.Services;
 
 namespace PictureQsMaui;
 
 public partial class MainPage : ContentPage
 {
     private readonly List<PointOfInterest> _pointsOfInterest = new();
-    private readonly string _imagePath = Path.Combine(FileSystem.CacheDirectory, "picture.png");
-    private readonly string _poiFilePath = Path.Combine(AppContext.BaseDirectory, "poi.json");
+    private readonly PictureLibraryService _pictureLibrary = new();
     private readonly ArrowDrawable _arrowDrawable = new();
+    private string _activePictureFileName = "picture.png";
     private PointOfInterest? _selectedPoi;
     private int _imagePixelWidth;
     private int _imagePixelHeight;
@@ -34,52 +35,91 @@ public partial class MainPage : ContentPage
     private async void OnPageLoaded(object? sender, EventArgs e)
     {
         Loaded -= OnPageLoaded;
-        await LoadImageAsync();
+        await _pictureLibrary.InitializeAsync();
+        _activePictureFileName = _pictureLibrary.SelectedPictureFileName;
+        await LoadActivePictureAsync();
+        LoadPointsOfInterest();
     }
 
-    private async Task LoadImageAsync()
+    private async Task LoadActivePictureAsync()
     {
-        await using (var source = await FileSystem.OpenAppPackageFileAsync("picture.png"))
-        await using (var destination = File.Create(_imagePath))
-        {
-            await source.CopyToAsync(destination);
-        }
+        var imagePath = _pictureLibrary.GetPicturePath(_activePictureFileName);
 
         var header = new byte[24];
-        await using (var stream = File.OpenRead(_imagePath))
+        await using (var stream = File.OpenRead(imagePath))
         {
             await stream.ReadExactlyAsync(header);
         }
 
         if (!header.AsSpan(0, 8).SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }))
         {
-            throw new InvalidDataException($"The picture at '{_imagePath}' is not a PNG image.");
+            using var imageStream = File.OpenRead(imagePath);
+            var image = Microsoft.Maui.Graphics.Platform.PlatformImage.FromStream(imageStream);
+            if (image is null)
+            {
+                throw new InvalidDataException($"The picture at '{imagePath}' could not be loaded.");
+            }
+
+            _imagePixelWidth = (int)Math.Round(image.Width);
+            _imagePixelHeight = (int)Math.Round(image.Height);
+            PictureImage.Source = ImageSource.FromFile(imagePath);
+            return;
         }
 
         _imagePixelWidth = BinaryPrimitives.ReadInt32BigEndian(header.AsSpan(16, 4));
         _imagePixelHeight = BinaryPrimitives.ReadInt32BigEndian(header.AsSpan(20, 4));
         if (_imagePixelWidth <= 0 || _imagePixelHeight <= 0)
         {
-            throw new InvalidDataException($"The picture at '{_imagePath}' has invalid dimensions.");
+            throw new InvalidDataException($"The picture at '{imagePath}' has invalid dimensions.");
         }
 
-        PictureImage.Source = ImageSource.FromFile(_imagePath);
+        PictureImage.Source = ImageSource.FromFile(imagePath);
+        UpdateSelectedPoiMarker();
     }
 
     private void LoadPointsOfInterest()
     {
-        if (File.Exists(_poiFilePath))
+        _pointsOfInterest.Clear();
+        var poiFilePath = _pictureLibrary.GetTargetsPath(_activePictureFileName);
+        if (File.Exists(poiFilePath))
         {
-            var json = File.ReadAllText(_poiFilePath);
+            var json = File.ReadAllText(poiFilePath);
             var points = JsonSerializer.Deserialize<List<PointOfInterest>>(json);
             if (points is not null)
             {
-                _pointsOfInterest.Clear();
                 _pointsOfInterest.AddRange(points);
             }
         }
 
+        _selectedPoi = null;
+        _arrowDrawable.SelectedPoi = null;
+        MarkerOverlay.Invalidate();
         UpdatePoiList();
+    }
+
+    private async void OnPicturesClicked(object? sender, EventArgs e)
+    {
+        var page = new PicturesPage(_pictureLibrary, _activePictureFileName);
+        page.Disappearing += OnPicturesPageDisappearing;
+        await Navigation.PushModalAsync(new NavigationPage(page));
+    }
+
+    private async void OnPicturesPageDisappearing(object? sender, EventArgs e)
+    {
+        if (sender is not PicturesPage page)
+        {
+            return;
+        }
+
+        page.Disappearing -= OnPicturesPageDisappearing;
+        if (!page.Confirmed || page.SelectedPictureFileName is null)
+        {
+            return;
+        }
+
+        _activePictureFileName = page.SelectedPictureFileName;
+        await LoadActivePictureAsync();
+        LoadPointsOfInterest();
     }
 
     private void UpdatePoiList()
@@ -223,7 +263,7 @@ public partial class MainPage : ContentPage
             WriteIndented = true
         });
 
-        File.WriteAllText(_poiFilePath, json);
+        File.WriteAllText(_pictureLibrary.GetTargetsPath(_activePictureFileName), json);
     }
 
     private Rect GetImageRenderRectangle()
