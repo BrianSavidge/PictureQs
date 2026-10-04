@@ -17,7 +17,7 @@
                     <Border Margin="0,0,0,8"
                             Padding="10"
                             Stroke="#D0D0D0">
-                        <Grid ColumnDefinitions="*,160"
+                        <Grid ColumnDefinitions="*,160,Auto"
                               ColumnSpacing="10">
                             <RadioButton Content="{Binding PictureFileName}"
                                          IsChecked="{Binding IsSelected, Mode=TwoWay}"
@@ -27,6 +27,10 @@
                                    Placeholder="Targets name (no .json)"
                                    VerticalOptions="Center"
                                    ClearButtonVisibility="WhileEditing" />
+                            <Button Grid.Column="2"
+                                    Text="Delete"
+                                    TextColor="DarkRed"
+                                    Clicked="OnDeletePictureClicked" />
                         </Grid>
                     </Border>
                 </DataTemplate>

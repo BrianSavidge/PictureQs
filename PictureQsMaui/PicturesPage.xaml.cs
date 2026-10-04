@@ -8,6 +8,7 @@ namespace PictureQsMaui;
 public partial class PicturesPage : ContentPage
 {
     private readonly PictureLibraryService _pictureLibrary;
+    private string _activePictureFileName;
 
     public ObservableCollection<PictureListItem> Pictures { get; } = new();
     public bool Confirmed { get; private set; }
@@ -16,6 +17,7 @@ public partial class PicturesPage : ContentPage
     public PicturesPage(PictureLibraryService pictureLibrary, string selectedPictureFileName)
     {
         _pictureLibrary = pictureLibrary;
+        _activePictureFileName = selectedPictureFileName;
         InitializeComponent();
         BindingContext = this;
         LoadPictures(selectedPictureFileName);
@@ -74,6 +76,83 @@ public partial class PicturesPage : ContentPage
         catch (InvalidDataException ex)
         {
             await DisplayAlertAsync("Unsupported picture", ex.Message, "OK");
+        }
+    }
+
+    private async void OnDeletePictureClicked(object? sender, EventArgs e)
+    {
+        if (sender is not Button { BindingContext: PictureListItem picture })
+        {
+            return;
+        }
+
+        if (Pictures.Count <= 1)
+        {
+            await DisplayAlertAsync("Cannot delete picture", "At least one picture must remain in the library.", "OK");
+            return;
+        }
+
+        var confirmed = await DisplayAlertAsync(
+            "Delete picture",
+            $"Delete '{picture.PictureFileName}'?",
+            "Delete",
+            "Cancel");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        var remainingPictures = Pictures.Where(item => !ReferenceEquals(item, picture)).ToList();
+        var selectedPicture = remainingPictures.FirstOrDefault(item => item.IsSelected)
+            ?? remainingPictures.FirstOrDefault(item => string.Equals(
+                item.PictureFileName,
+                _activePictureFileName,
+                StringComparison.OrdinalIgnoreCase))
+            ?? remainingPictures[0];
+        var targetFileNames = remainingPictures.ToDictionary(
+            item => item.PictureFileName,
+            item => string.IsNullOrWhiteSpace(item.TargetsFileName)
+                ? _pictureLibrary.GetTargetsFileName(item.PictureFileName)
+                : item.TargetsFileName.Trim(),
+            StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            await _pictureLibrary.DeletePictureAsync(
+                picture.PictureFileName,
+                selectedPicture.PictureFileName,
+                targetFileNames);
+
+            if (string.Equals(
+                    picture.PictureFileName,
+                    _activePictureFileName,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                _activePictureFileName = selectedPicture.PictureFileName;
+                Confirmed = true;
+                SelectedPictureFileName = _activePictureFileName;
+            }
+
+            LoadPictures(selectedPicture.PictureFileName);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or InvalidOperationException)
+        {
+            if (!File.Exists(_pictureLibrary.GetPicturePath(picture.PictureFileName)))
+            {
+                if (string.Equals(
+                        picture.PictureFileName,
+                        _activePictureFileName,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    _activePictureFileName = selectedPicture.PictureFileName;
+                    Confirmed = true;
+                    SelectedPictureFileName = _activePictureFileName;
+                }
+
+                LoadPictures(selectedPicture.PictureFileName);
+            }
+
+            await DisplayAlertAsync("Could not delete picture", ex.Message, "OK");
         }
     }
 

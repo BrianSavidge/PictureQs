@@ -21,7 +21,7 @@ public sealed class PictureLibraryService
         Directory.CreateDirectory(_folderPath);
 
         var defaultPicturePath = Path.Combine(_folderPath, "picture.png");
-        if (!File.Exists(defaultPicturePath))
+        if (!File.Exists(defaultPicturePath) && !GetPictureFileNames().Any())
         {
             await using var source = await FileSystem.OpenAppPackageFileAsync("picture.png");
             await using var destination = File.Create(defaultPicturePath);
@@ -133,6 +133,56 @@ public sealed class PictureLibraryService
         var importedFileName = Path.GetFileName(destinationPath);
         _targetFileNames[importedFileName] = Path.GetFileNameWithoutExtension(importedFileName);
         return importedFileName;
+    }
+
+    public async Task DeletePictureAsync(
+        string pictureFileName,
+        string selectedPictureFileName,
+        IReadOnlyDictionary<string, string> targetFileNames)
+    {
+        var safePictureFileName = GetSafeFileName(pictureFileName);
+        var picturePath = GetPicturePath(safePictureFileName);
+        var pictureFileNames = GetPictureFileNames();
+        if (!pictureFileNames.Contains(safePictureFileName, StringComparer.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("The picture is no longer available.");
+        }
+
+        var remainingPictureFileNames = pictureFileNames
+            .Where(fileName => !string.Equals(fileName, safePictureFileName, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (remainingPictureFileNames.Count == 0)
+        {
+            throw new InvalidOperationException("At least one picture must remain in the library.");
+        }
+
+        var safeSelectedPictureFileName = remainingPictureFileNames.Contains(
+            selectedPictureFileName,
+            StringComparer.OrdinalIgnoreCase)
+                ? selectedPictureFileName
+                : remainingPictureFileNames[0];
+        var deletedTargetsPath = GetTargetsPath(safePictureFileName);
+        var remainingTargetFileNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var remainingPictureFileName in remainingPictureFileNames)
+        {
+            var targetFileName = targetFileNames.TryGetValue(remainingPictureFileName, out var suppliedTargetFileName)
+                ? suppliedTargetFileName
+                : GetTargetsFileName(remainingPictureFileName);
+            remainingTargetFileNames[remainingPictureFileName] = GetSafeFileName(targetFileName);
+        }
+
+        await SaveSettingsAsync(safeSelectedPictureFileName, remainingTargetFileNames);
+        File.Delete(picturePath);
+
+        var targetsFileIsStillAssociated = remainingTargetFileNames.Values.Any(targetFileName =>
+            string.Equals(
+                Path.GetFullPath(Path.Combine(_folderPath, $"{GetSafeFileName(targetFileName)}.json")),
+                Path.GetFullPath(deletedTargetsPath),
+                StringComparison.OrdinalIgnoreCase));
+        if (!targetsFileIsStillAssociated)
+        {
+            File.Delete(deletedTargetsPath);
+        }
     }
 
     public async Task SaveSettingsAsync(string selectedPictureFileName, IReadOnlyDictionary<string, string> targetFileNames)

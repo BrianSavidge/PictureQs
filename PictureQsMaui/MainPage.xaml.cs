@@ -97,6 +97,7 @@ public partial class MainPage : ContentPage
 
         _selectedPoi = null;
         _arrowDrawable.SelectedPoi = null;
+        _arrowDrawable.GuessPosition = null;
         MarkerOverlay.Invalidate();
         UpdatePoiList();
     }
@@ -170,6 +171,8 @@ public partial class MainPage : ContentPage
     private void OnViewClicked(object? sender, EventArgs e)
     {
         _isRandomMode = !_isRandomMode;
+        _arrowDrawable.GuessPosition = null;
+        ViewModeButton.Text = _isRandomMode ? "Edit Mode" : "Quiz Mode";
         RandomButton.IsVisible = _isRandomMode;
         if (_isRandomMode)
         {
@@ -188,6 +191,7 @@ public partial class MainPage : ContentPage
             .ToList();
 
         _randomPoi = SelectRandomPoi(sorted, _randomPoi);
+        _arrowDrawable.GuessPosition = null;
         UpdatePoiList();
     }
 
@@ -246,6 +250,20 @@ public partial class MainPage : ContentPage
             return;
         }
 
+        if (_isRandomMode)
+        {
+            if (_randomPoi is null)
+            {
+                return;
+            }
+
+            _arrowDrawable.ImageRect = rect;
+            _arrowDrawable.GuessPosition = new PointF((float)xPercent, (float)yPercent);
+            _arrowDrawable.SelectedPoi = _randomPoi;
+            MarkerOverlay.Invalidate();
+            return;
+        }
+
         var text = await DisplayPromptAsync("Add point of interest", "Description");
         if (string.IsNullOrWhiteSpace(text))
         {
@@ -286,6 +304,7 @@ public partial class MainPage : ContentPage
         SavePointsOfInterest();
         _selectedPoi = null;
         _arrowDrawable.SelectedPoi = null;
+        _arrowDrawable.GuessPosition = null;
         if (_randomPoi == poiToRemove)
         {
             _randomPoi = null;
@@ -314,6 +333,7 @@ public partial class MainPage : ContentPage
         {
             _selectedPoi = null;
             _arrowDrawable.SelectedPoi = null;
+            _arrowDrawable.GuessPosition = null;
             MarkerOverlay.Invalidate();
             return;
         }
@@ -324,13 +344,17 @@ public partial class MainPage : ContentPage
     private void SelectPoi(PointOfInterest poi)
     {
         _selectedPoi = poi;
+        _arrowDrawable.GuessPosition = null;
         _arrowDrawable.SelectedPoi = poi;
         UpdateSelectedPoiMarker();
     }
 
     private void UpdateSelectedPoiMarker()
     {
-        if (_selectedPoi is null)
+        var poiToDisplay = _isRandomMode && _arrowDrawable.GuessPosition is not null
+            ? _randomPoi
+            : _selectedPoi;
+        if (poiToDisplay is null)
         {
             _arrowDrawable.SelectedPoi = null;
             MarkerOverlay.Invalidate();
@@ -338,7 +362,7 @@ public partial class MainPage : ContentPage
         }
 
         _arrowDrawable.ImageRect = GetImageRenderRectangle();
-        _arrowDrawable.SelectedPoi = _selectedPoi;
+        _arrowDrawable.SelectedPoi = poiToDisplay;
         MarkerOverlay.Invalidate();
     }
 
@@ -380,10 +404,27 @@ public class ArrowDrawable : IDrawable
 {
     public PointOfInterest? SelectedPoi { get; set; }
     public Rect ImageRect { get; set; }
+    public PointF? GuessPosition { get; set; }
     public bool IsFlashing { get; set; }
 
     public void Draw(ICanvas canvas, RectF dirtyRect)
     {
+        if (ImageRect.Width <= 0 || ImageRect.Height <= 0)
+        {
+            return;
+        }
+
+        if (GuessPosition is PointF guessPosition)
+        {
+            DrawMarker(
+                canvas,
+                ImageRect.Left + (guessPosition.X * ImageRect.Width),
+                ImageRect.Top + ((1 - guessPosition.Y) * ImageRect.Height),
+                Colors.Orange,
+                6,
+                56);
+        }
+
         if (SelectedPoi is null)
         {
             return;
@@ -391,27 +432,30 @@ public class ArrowDrawable : IDrawable
 
         var x = ImageRect.Left + (SelectedPoi.XPercent * ImageRect.Width);
         var y = ImageRect.Top + ((1 - SelectedPoi.YPercent) * ImageRect.Height);
+        var lineWidth = IsFlashing ? 8 : 6;
+        var correctLocationColor = GuessPosition is null ? Colors.Red : Colors.Green;
+        var strokeColor = IsFlashing ? correctLocationColor.WithAlpha(0.2f) : correctLocationColor;
+        DrawMarker(canvas, x, y, strokeColor, lineWidth, 56);
+    }
 
-        if (double.IsNaN(x) || double.IsNaN(y) || ImageRect.Width <= 0 || ImageRect.Height <= 0)
+    private void DrawMarker(ICanvas canvas, double x, double y, Color color, double lineWidth, double arrowHeight)
+    {
+        if (double.IsNaN(x) || double.IsNaN(y))
         {
             return;
         }
 
-        var arrowHeight = 56d;
-        var lineWidth = IsFlashing ? 8 : 6;
-        var strokeColor = IsFlashing ? Colors.Red.WithAlpha(0.2f) : Colors.Red;
-
         if (ImageRect.Height < arrowHeight + 12 || ImageRect.Width < 50)
         {
-            canvas.StrokeColor = strokeColor;
-            canvas.StrokeSize = 6;
-            canvas.FillColor = strokeColor;
+            canvas.StrokeColor = color;
+            canvas.StrokeSize = (float)lineWidth;
+            canvas.FillColor = color;
             canvas.DrawEllipse((float)x - 6, (float)y - 6, 12, 12);
             return;
         }
 
-        canvas.StrokeColor = strokeColor;
-        canvas.StrokeSize = lineWidth;
+        canvas.StrokeColor = color;
+        canvas.StrokeSize = (float)lineWidth;
         canvas.StrokeLineCap = LineCap.Round;
 
         canvas.DrawLine((float)x, (float)(y - arrowHeight), (float)x, (float)y);
