@@ -20,18 +20,11 @@ public sealed class PictureLibraryService
     {
         Directory.CreateDirectory(_folderPath);
 
-        var defaultPicturePath = Path.Combine(_folderPath, "picture.png");
-        if (!File.Exists(defaultPicturePath) && !GetPictureFileNames().Any())
-        {
-            await using var source = await FileSystem.OpenAppPackageFileAsync("picture.png");
-            await using var destination = File.Create(defaultPicturePath);
-            await source.CopyToAsync(destination);
-        }
-
+        PictureLibrarySettings? settings = null;
         if (File.Exists(_settingsFilePath))
         {
             var settingsJson = await File.ReadAllTextAsync(_settingsFilePath);
-            var settings = JsonSerializer.Deserialize<PictureLibrarySettings>(settingsJson);
+            settings = JsonSerializer.Deserialize<PictureLibrarySettings>(settingsJson);
             if (settings is not null)
             {
                 foreach (var pair in settings.TargetFileNames)
@@ -42,11 +35,28 @@ public sealed class PictureLibraryService
                     }
                 }
 
-                if (GetPictureFileNames().Contains(settings.SelectedPictureFileName, StringComparer.OrdinalIgnoreCase))
-                {
-                    SelectedPictureFileName = settings.SelectedPictureFileName;
-                }
             }
+        }
+
+        if (settings?.BundledPicturesInitialized != true)
+        {
+            var defaultPicturePath = Path.Combine(_folderPath, "picture.png");
+            if (!File.Exists(defaultPicturePath) && !GetPictureFileNames().Any())
+            {
+                await CopyBundledPictureAsync("picture.png", defaultPicturePath);
+            }
+
+            var blankedPicturePath = Path.Combine(_folderPath, "picture-Blanked.png");
+            if (!File.Exists(blankedPicturePath))
+            {
+                await CopyBundledPictureAsync("picture-Blanked.png", blankedPicturePath);
+            }
+        }
+
+        if (settings is not null &&
+            GetPictureFileNames().Contains(settings.SelectedPictureFileName, StringComparer.OrdinalIgnoreCase))
+        {
+            SelectedPictureFileName = settings.SelectedPictureFileName;
         }
 
         if (File.Exists(Path.Combine(_folderPath, "poi.json")) == false)
@@ -60,9 +70,27 @@ public sealed class PictureLibraryService
         }
 
         _targetFileNames.TryAdd("picture.png", "poi");
+        if (settings?.BundledPicturesInitialized != true)
+        {
+            _targetFileNames["picture-Blanked.png"] = GetTargetsFileName("picture.png");
+        }
+        else
+        {
+            _targetFileNames.TryAdd("picture-Blanked.png", GetTargetsFileName("picture.png"));
+        }
+
         foreach (var fileName in GetPictureFileNames())
         {
             _targetFileNames.TryAdd(fileName, Path.GetFileNameWithoutExtension(fileName));
+        }
+
+        if (settings?.BundledPicturesInitialized != true)
+        {
+            var targetFileNames = GetPictureFileNames().ToDictionary(
+                fileName => fileName,
+                GetTargetsFileName,
+                StringComparer.OrdinalIgnoreCase);
+            await SaveSettingsAsync(SelectedPictureFileName, targetFileNames);
         }
     }
 
@@ -206,7 +234,8 @@ public sealed class PictureLibraryService
         var settings = new PictureLibrarySettings
         {
             SelectedPictureFileName = selectedPictureFileName,
-            TargetFileNames = safeTargetNames
+            TargetFileNames = safeTargetNames,
+            BundledPicturesInitialized = true
         };
         var settingsJson = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
         await File.WriteAllTextAsync(_settingsFilePath, settingsJson);
@@ -218,6 +247,13 @@ public sealed class PictureLibraryService
         }
 
         SelectedPictureFileName = selectedPictureFileName;
+    }
+
+    private static async Task CopyBundledPictureAsync(string assetFileName, string destinationPath)
+    {
+        await using var source = await FileSystem.OpenAppPackageFileAsync(assetFileName);
+        await using var destination = File.Create(destinationPath);
+        await source.CopyToAsync(destination);
     }
 
     private static string GetSafeFileName(string fileName)
@@ -255,6 +291,7 @@ public sealed class PictureLibraryService
     {
         public string SelectedPictureFileName { get; set; } = "picture.png";
         public Dictionary<string, string> TargetFileNames { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+        public bool BundledPicturesInitialized { get; set; }
 
         public PictureLibrarySettings()
         {

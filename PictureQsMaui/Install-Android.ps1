@@ -88,6 +88,9 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 & $adbPath -s $selectedDevice.Serial shell am force-stop $applicationId
+$syncScript = Join-Path $PSScriptRoot "Sync-AndroidAppData.ps1"
+& $syncScript -Mode Restore -DeviceSerial $selectedDevice.Serial
+
 $activityComponent = & $adbPath -s $selectedDevice.Serial shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -p $applicationId |
     Where-Object { $_ -match "/" } |
     Select-Object -Last 1
