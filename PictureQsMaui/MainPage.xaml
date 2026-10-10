@@ -36,14 +36,7 @@
 
                     <Grid x:Name="GestureSurface"
                           BackgroundColor="Transparent">
-                        <Grid.GestureRecognizers>
-                            <TapGestureRecognizer Tapped="OnMarkerOverlayTapped" />
-                        </Grid.GestureRecognizers>
                     </Grid>
-
-                    <Grid x:Name="ZoomGestureSurface"
-                          IsVisible="False"
-                          BackgroundColor="Transparent" />
                 </Grid>
             </Border>
         </Grid>
@@ -99,25 +92,10 @@
                             IsVisible="False"
                             Clicked="OnRandomClicked" />
                 </Grid>
-                <Grid Grid.Row="1"
-                      ColumnDefinitions="*,*"
-                      ColumnSpacing="8">
+                <Grid Grid.Row="1">
                     <Button x:Name="PicturesButton"
                             Text="Pictures"
                             Clicked="OnPicturesClicked" />
-                    <Button x:Name="ZoomToolButton"
-                            Text="Zoom"
-                            IsVisible="False"
-                            Clicked="OnZoomToolClicked" />
-                    <Button Grid.Column="1"
-                            x:Name="ZoomModeEntryButton"
-                            Text="Zoom Mode"
-                            Clicked="OnZoomModeClicked" />
-                    <Button Grid.Column="1"
-                            x:Name="ExitZoomModeButton"
-                            Text="Exit Zoom Mode"
-                            IsVisible="False"
-                            Clicked="OnZoomModeClicked" />
                 </Grid>
             </Grid>
         </Grid>

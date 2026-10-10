@@ -22,7 +22,6 @@ public partial class MainPage : ContentPage
     private PointOfInterest? _selectedPoi;
     private bool _isRandomMode;
     private bool _isUpdatingPoiList;
-    private bool _isZoomMode;
     private int _imagePixelWidth;
     private int _imagePixelHeight;
     private double _zoomLevel = MinZoom;
@@ -39,7 +38,12 @@ public partial class MainPage : ContentPage
         MarkerOverlay.Drawable = _arrowDrawable;
         _pinchGesture.PinchUpdated += OnPicturePinched;
 #if ANDROID
-        ZoomGestureSurface.HandlerChanged += OnZoomGestureSurfaceHandlerChanged;
+        GestureSurface.HandlerChanged += OnGestureSurfaceHandlerChanged;
+#else
+        var tapGesture = new TapGestureRecognizer();
+        tapGesture.Tapped += OnMarkerOverlayTapped;
+        GestureSurface.GestureRecognizers.Add(tapGesture);
+        GestureSurface.GestureRecognizers.Add(_pinchGesture);
 #endif
 
         Loaded += OnPageLoaded;
@@ -232,42 +236,10 @@ public partial class MainPage : ContentPage
         return pointsOfInterest[nextIndex];
     }
 
-    private void OnZoomModeClicked(object? sender, EventArgs e)
-    {
-        _isZoomMode = !_isZoomMode;
-        ViewModeControls.IsVisible = !_isZoomMode;
-        PicturesButton.IsVisible = !_isZoomMode;
-        ZoomModeEntryButton.IsVisible = !_isZoomMode;
-        ZoomToolButton.IsVisible = _isZoomMode;
-        ExitZoomModeButton.IsVisible = _isZoomMode;
-        GestureSurface.IsVisible = !_isZoomMode;
-        ZoomGestureSurface.IsVisible = _isZoomMode;
-        UpdateZoomToolSelection();
-    }
-
-    private void OnZoomToolClicked(object? sender, EventArgs e)
-    {
-        UpdateZoomToolSelection();
-    }
-
-    private void UpdateZoomToolSelection()
-    {
-        ZoomToolButton.BackgroundColor = Colors.DodgerBlue;
-        ZoomToolButton.TextColor = Colors.White;
-
-#if !ANDROID
-        ZoomGestureSurface.GestureRecognizers.Remove(_pinchGesture);
-        if (_isZoomMode)
-        {
-            ZoomGestureSurface.GestureRecognizers.Add(_pinchGesture);
-        }
-#endif
-    }
-
 #if ANDROID
-    private void OnZoomGestureSurfaceHandlerChanged(object? sender, EventArgs e)
+    private void OnGestureSurfaceHandlerChanged(object? sender, EventArgs e)
     {
-        if (ZoomGestureSurface.Handler?.PlatformView is not Android.Views.View platformView)
+        if (GestureSurface.Handler?.PlatformView is not Android.Views.View platformView)
         {
             return;
         }
@@ -286,26 +258,28 @@ public partial class MainPage : ContentPage
         private double _startPanY;
         private double _startCenterX;
         private double _startCenterY;
+        private double _tapStartX;
+        private double _tapStartY;
+        private bool _hadMultiplePointers;
 
         public bool OnTouch(Android.Views.View? view, Android.Views.MotionEvent? motionEvent)
         {
-            if (motionEvent is null)
+            if (motionEvent is null || view is null)
             {
                 return false;
             }
 
-            if (!page._isZoomMode)
-            {
-                _gestureActive = false;
-                return false;
-            }
-
+            var density = view.Context?.Resources?.DisplayMetrics?.Density ?? 1.0f;
             switch (motionEvent.ActionMasked)
             {
                 case Android.Views.MotionEventActions.Down:
                     _gestureActive = false;
+                    _hadMultiplePointers = false;
+                    _tapStartX = motionEvent.GetX() / density;
+                    _tapStartY = motionEvent.GetY() / density;
                     break;
                 case Android.Views.MotionEventActions.PointerDown when motionEvent.PointerCount >= 2:
+                    _hadMultiplePointers = true;
                     _startDistance = GetDistance(motionEvent);
                     _startZoom = page._zoomLevel;
                     _startPanX = page._panX;
@@ -335,9 +309,27 @@ public partial class MainPage : ContentPage
                     page.ApplyPictureTransform();
                     break;
                 case Android.Views.MotionEventActions.PointerUp:
+                    _gestureActive = false;
+                    break;
                 case Android.Views.MotionEventActions.Up:
+                    if (!_hadMultiplePointers)
+                    {
+                        var tapX = motionEvent.GetX() / density;
+                        var tapY = motionEvent.GetY() / density;
+                        var deltaX = tapX - _tapStartX;
+                        var deltaY = tapY - _tapStartY;
+                        if ((deltaX * deltaX) + (deltaY * deltaY) < 100)
+                        {
+                            _ = page.OnPictureTappedAsync(new Point(tapX, tapY));
+                        }
+                    }
+
+                    _gestureActive = false;
+                    _hadMultiplePointers = false;
+                    break;
                 case Android.Views.MotionEventActions.Cancel:
                     _gestureActive = false;
+                    _hadMultiplePointers = false;
                     break;
             }
 
@@ -365,11 +357,6 @@ public partial class MainPage : ContentPage
 
     private void OnPicturePinched(object? sender, PinchGestureUpdatedEventArgs e)
     {
-        if (!_isZoomMode)
-        {
-            return;
-        }
-
         switch (e.Status)
         {
             case GestureStatus.Started:
@@ -440,23 +427,21 @@ public partial class MainPage : ContentPage
 
     private async void OnMarkerOverlayTapped(object? sender, TappedEventArgs e)
     {
-        if (_isZoomMode)
+        await OnPictureTappedAsync(e.GetPosition(GestureSurface));
+    }
+
+    private async Task OnPictureTappedAsync(Point? touchPosition)
+    {
+        if (touchPosition is null)
         {
             return;
         }
 
-        var position = e.GetPosition(PictureViewport);
-        if (position is null)
-        {
-            return;
-        }
-
-        var touchPosition = position.Value;
         var centerX = PictureViewport.Width / 2.0;
         var centerY = PictureViewport.Height / 2.0;
         var imagePosition = new Point(
-            centerX + ((touchPosition.X - centerX - _panX) / _zoomLevel),
-            centerY + ((touchPosition.Y - centerY - _panY) / _zoomLevel));
+            centerX + ((touchPosition.Value.X - centerX - _panX) / _zoomLevel),
+            centerY + ((touchPosition.Value.Y - centerY - _panY) / _zoomLevel));
         var rect = GetImageRenderRectangle();
 
         if (rect.Width <= 0 || rect.Height <= 0)
