@@ -17,9 +17,9 @@
                     <Border Margin="0,0,0,8"
                             Padding="10"
                             Stroke="#D0D0D0">
-                        <Grid ColumnDefinitions="*,160,Auto"
+                        <Grid ColumnDefinitions="*,160,Auto,Auto"
                               ColumnSpacing="10">
-                            <RadioButton Content="{Binding PictureFileName}"
+                            <RadioButton Content="{Binding PictureName}"
                                          IsChecked="{Binding IsSelected, Mode=TwoWay}"
                                          VerticalOptions="Center" />
                             <Entry Grid.Column="1"
@@ -28,6 +28,9 @@
                                    VerticalOptions="Center"
                                    ClearButtonVisibility="WhileEditing" />
                             <Button Grid.Column="2"
+                                    Text="Edit names"
+                                    Clicked="OnEditPictureNamesClicked" />
+                            <Button Grid.Column="3"
                                     Text="Delete"
                                     TextColor="DarkRed"
                                     Clicked="OnDeletePictureClicked" />

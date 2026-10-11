@@ -127,7 +127,7 @@ public sealed class PictureLibraryService
             : Path.GetFileNameWithoutExtension(pictureFileName);
     }
 
-    public async Task<string> ImportPictureAsync(FileResult photo)
+    public async Task<string> ImportPictureAsync(FileResult photo, string pictureName, string targetsFileName)
     {
         var fileName = Path.GetFileName(photo.FileName);
         var extension = Path.GetExtension(fileName);
@@ -136,31 +136,139 @@ public sealed class PictureLibraryService
             throw new InvalidDataException($"The selected file type '{extension}' is not supported.");
         }
 
-        var baseName = Path.GetFileNameWithoutExtension(fileName);
-        foreach (var invalidCharacter in Path.GetInvalidFileNameChars())
+        var safePictureName = GetSafeFileName(pictureName);
+        var safeTargetsFileName = GetSafeFileName(targetsFileName);
+        var importedFileName = $"{safePictureName}{extension}";
+        if (GetPictureFileNames().Contains(importedFileName, StringComparer.OrdinalIgnoreCase))
         {
-            baseName = baseName.Replace(invalidCharacter, '_');
+            throw new InvalidDataException($"A picture named '{safePictureName}' already exists.");
         }
 
-        if (string.IsNullOrWhiteSpace(baseName))
-        {
-            baseName = "picture";
-        }
-
-        var destinationPath = Path.Combine(_folderPath, $"{baseName}{extension}");
-        var suffix = 2;
-        while (File.Exists(destinationPath))
-        {
-            destinationPath = Path.Combine(_folderPath, $"{baseName} ({suffix++}){extension}");
-        }
-
+        var destinationPath = Path.Combine(_folderPath, importedFileName);
         await using var source = await photo.OpenReadAsync();
-        await using var destination = File.Create(destinationPath);
+        await using var destination = new FileStream(destinationPath, FileMode.CreateNew, FileAccess.Write);
         await source.CopyToAsync(destination);
 
-        var importedFileName = Path.GetFileName(destinationPath);
-        _targetFileNames[importedFileName] = Path.GetFileNameWithoutExtension(importedFileName);
+        _targetFileNames[importedFileName] = safeTargetsFileName;
         return importedFileName;
+    }
+
+    public async Task<string> RenamePictureAsync(
+        string pictureFileName,
+        string pictureName,
+        string targetsFileName,
+        string selectedPictureFileName,
+        IReadOnlyDictionary<string, string> targetFileNames,
+        bool reuseExistingTargetsFile = false)
+    {
+        var safePictureFileName = GetSafeFileName(pictureFileName);
+        var oldPicturePath = GetPicturePath(safePictureFileName);
+        if (!File.Exists(oldPicturePath))
+        {
+            throw new InvalidOperationException("The picture is no longer available.");
+        }
+
+        var safePictureName = GetSafeFileName(pictureName);
+        var safeTargetsFileName = GetSafeFileName(targetsFileName);
+        var renamedPictureFileName = $"{safePictureName}{Path.GetExtension(safePictureFileName)}";
+        var renamedPicturePath = GetPicturePath(renamedPictureFileName);
+        if (!string.Equals(safePictureFileName, renamedPictureFileName, StringComparison.OrdinalIgnoreCase) &&
+            File.Exists(renamedPicturePath))
+        {
+            throw new IOException($"A picture named '{safePictureName}' already exists.");
+        }
+
+        var oldTargetsFileName = GetTargetsFileName(safePictureFileName);
+        var oldTargetsPath = GetTargetsPath(safePictureFileName);
+        var renamedTargetsPath = Path.Combine(_folderPath, $"{safeTargetsFileName}.json");
+        var targetsFileNameChanged = !string.Equals(oldTargetsPath, renamedTargetsPath, StringComparison.OrdinalIgnoreCase);
+        var sharedTargetsFile = GetPictureFileNames().Any(fileName =>
+            !string.Equals(fileName, safePictureFileName, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(
+                targetFileNames.TryGetValue(fileName, out var targetName) ? targetName.Trim() : GetTargetsFileName(fileName),
+                oldTargetsFileName,
+                StringComparison.OrdinalIgnoreCase));
+        var movedTargetsFile = false;
+        var copiedTargetsFile = false;
+        var renamedPicture = false;
+
+        var existingTargetsFile = targetsFileNameChanged && File.Exists(renamedTargetsPath);
+        if (existingTargetsFile && !reuseExistingTargetsFile)
+        {
+            throw new IOException($"A JSON file named '{safeTargetsFileName}.json' already exists.");
+        }
+
+        try
+        {
+            if (targetsFileNameChanged && File.Exists(oldTargetsPath) && !existingTargetsFile)
+            {
+                if (sharedTargetsFile)
+                {
+                    File.Copy(oldTargetsPath, renamedTargetsPath);
+                    copiedTargetsFile = true;
+                }
+                else
+                {
+                    File.Move(oldTargetsPath, renamedTargetsPath);
+                    movedTargetsFile = true;
+                }
+            }
+
+            if (!string.Equals(safePictureFileName, renamedPictureFileName, StringComparison.Ordinal))
+            {
+                File.Move(oldPicturePath, renamedPicturePath);
+                renamedPicture = true;
+            }
+
+            var updatedTargetFileNames = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (fileName, targetName) in targetFileNames)
+            {
+                if (!GetPictureFileNames().Contains(fileName, StringComparer.OrdinalIgnoreCase) &&
+                    !string.Equals(fileName, safePictureFileName, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var updatedFileName = string.Equals(fileName, safePictureFileName, StringComparison.OrdinalIgnoreCase)
+                    ? renamedPictureFileName
+                    : fileName;
+                updatedTargetFileNames[updatedFileName] = string.Equals(fileName, safePictureFileName, StringComparison.OrdinalIgnoreCase)
+                    ? safeTargetsFileName
+                    : GetSafeFileName(targetName);
+            }
+
+            await SaveSettingsAsync(
+                selectedPictureFileName,
+                updatedTargetFileNames);
+
+            if (existingTargetsFile &&
+                File.Exists(oldTargetsPath) &&
+                !sharedTargetsFile &&
+                !string.Equals(oldTargetsPath, renamedTargetsPath, StringComparison.OrdinalIgnoreCase))
+            {
+                File.Delete(oldTargetsPath);
+            }
+
+            return renamedPictureFileName;
+        }
+        catch
+        {
+            if (renamedPicture && File.Exists(renamedPicturePath))
+            {
+                File.Move(renamedPicturePath, oldPicturePath);
+            }
+
+            if (movedTargetsFile && File.Exists(renamedTargetsPath))
+            {
+                File.Move(renamedTargetsPath, oldTargetsPath);
+            }
+            else if (copiedTargetsFile && File.Exists(renamedTargetsPath))
+            {
+                File.Delete(renamedTargetsPath);
+            }
+
+            throw;
+        }
     }
 
     public async Task DeletePictureAsync(

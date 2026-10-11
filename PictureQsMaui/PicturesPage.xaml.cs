@@ -51,9 +51,38 @@ public partial class PicturesPage : ContentPage
             }
 
             string? lastImportedPictureFileName = null;
+            var existingTargetFileNames = Pictures
+                .Select(picture => picture.TargetsFileName)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
             foreach (var photo in photos)
             {
-                lastImportedPictureFileName = await _pictureLibrary.ImportPictureAsync(photo);
+                var namePage = new PictureNamePage(
+                    Path.GetFileNameWithoutExtension(photo.FileName),
+                    previewSource: ImageSource.FromFile(photo.FullPath),
+                    existingTargetsFileNames: existingTargetFileNames);
+                await Navigation.PushModalAsync(new NavigationPage(namePage));
+                var names = await namePage.Completion;
+                if (names is null)
+                {
+                    break;
+                }
+
+                try
+                {
+                    lastImportedPictureFileName = await _pictureLibrary.ImportPictureAsync(
+                        photo,
+                        names.PictureName,
+                        names.TargetsFileName);
+                    existingTargetFileNames.Add(names.TargetsFileName);
+                }
+                catch (InvalidDataException ex)
+                {
+                    await DisplayAlertAsync("Invalid name", ex.Message, "OK");
+                }
+                catch (IOException ex)
+                {
+                    await DisplayAlertAsync("Could not add picture", ex.Message, "OK");
+                }
             }
 
             if (lastImportedPictureFileName is not null)
@@ -79,6 +108,77 @@ public partial class PicturesPage : ContentPage
         }
     }
 
+    private async void OnEditPictureNamesClicked(object? sender, EventArgs e)
+    {
+        if (sender is not Button { BindingContext: PictureListItem picture })
+        {
+            return;
+        }
+
+        var namePage = new PictureNamePage(
+            picture.PictureName,
+            picture.TargetsFileName,
+            "Edit picture names",
+            ImageSource.FromFile(_pictureLibrary.GetPicturePath(picture.PictureFileName)),
+            Pictures
+                .Where(item => !ReferenceEquals(item, picture))
+                .Select(item => item.TargetsFileName),
+            hasCurrentTargetsFile: true);
+        await Navigation.PushModalAsync(new NavigationPage(namePage));
+        var names = await namePage.Completion;
+        if (names is null)
+        {
+            return;
+        }
+
+        var targetFileNames = Pictures.ToDictionary(
+            item => item.PictureFileName,
+            item => ReferenceEquals(item, picture) ? names.TargetsFileName : item.TargetsFileName.Trim(),
+            StringComparer.OrdinalIgnoreCase);
+        var selectedPicture = Pictures.FirstOrDefault(item => item.IsSelected);
+        var selectedPictureFileName = selectedPicture?.PictureFileName ?? _activePictureFileName;
+        var renamedSelectedPictureFileName = string.Equals(
+            selectedPictureFileName,
+            picture.PictureFileName,
+            StringComparison.OrdinalIgnoreCase)
+                ? $"{names.PictureName}{Path.GetExtension(picture.PictureFileName)}"
+                : selectedPictureFileName;
+        try
+        {
+            var renamedPictureFileName = await _pictureLibrary.RenamePictureAsync(
+                picture.PictureFileName,
+                names.PictureName,
+                names.TargetsFileName,
+                renamedSelectedPictureFileName,
+                targetFileNames,
+                names.ReuseExistingTargetsFile);
+
+            if (string.Equals(
+                    picture.PictureFileName,
+                    _activePictureFileName,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                _activePictureFileName = renamedPictureFileName;
+            }
+
+            Confirmed = true;
+            SelectedPictureFileName = renamedSelectedPictureFileName;
+            LoadPictures(renamedSelectedPictureFileName);
+        }
+        catch (InvalidDataException ex)
+        {
+            await DisplayAlertAsync("Invalid name", ex.Message, "OK");
+        }
+        catch (IOException ex)
+        {
+            await DisplayAlertAsync("Could not rename picture", ex.Message, "OK");
+        }
+        catch (InvalidOperationException ex)
+        {
+            await DisplayAlertAsync("Could not rename picture", ex.Message, "OK");
+        }
+    }
+
     private async void OnDeletePictureClicked(object? sender, EventArgs e)
     {
         if (sender is not Button { BindingContext: PictureListItem picture })
@@ -94,7 +194,7 @@ public partial class PicturesPage : ContentPage
 
         var confirmed = await DisplayAlertAsync(
             "Delete picture",
-            $"Delete '{picture.PictureFileName}'?",
+            $"Delete '{picture.PictureName}'?",
             "Delete",
             "Cancel");
         if (!confirmed)
@@ -203,6 +303,7 @@ public partial class PicturesPage : ContentPage
         private string _targetsFileName;
 
         public string PictureFileName { get; }
+        public string PictureName => Path.GetFileNameWithoutExtension(PictureFileName);
         public string TargetsFileName
         {
             get => _targetsFileName;
