@@ -7,8 +7,12 @@
     <Grid Padding="16"
           RowDefinitions="Auto,*,Auto"
           RowSpacing="12">
-        <Button Text="Choose picture from gallery"
-                Clicked="OnAddPictureClicked" />
+        <HorizontalStackLayout Spacing="8">
+            <Button Text="Choose picture from gallery"
+                    Clicked="OnAddPictureClicked" />
+            <Button Text="Backup"
+                    Clicked="OnBackupClicked" />
+        </HorizontalStackLayout>
 
         <CollectionView Grid.Row="1"
                         ItemsSource="{Binding Pictures}">

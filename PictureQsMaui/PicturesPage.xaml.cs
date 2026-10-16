@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Net.Mail;
 using System.Runtime.CompilerServices;
 using PictureQsMaui.Services;
 
@@ -37,6 +38,118 @@ public partial class PicturesPage : ContentPage
         {
             picture.SetPictureItems(pictureItems);
             Pictures.Add(picture);
+        }
+    }
+
+    private async void OnBackupClicked(object? sender, EventArgs e)
+    {
+        var enteredEmail = await DisplayPromptAsync(
+            "Back up pictures",
+            "Enter the email address to send the backup to.",
+            "Continue",
+            "Cancel",
+            keyboard: Keyboard.Email);
+        if (string.IsNullOrWhiteSpace(enteredEmail))
+        {
+            return;
+        }
+
+        var emailAddress = enteredEmail.Trim();
+        if (!MailAddress.TryCreate(emailAddress, out var parsedAddress) ||
+            !string.Equals(parsedAddress.Address, emailAddress, StringComparison.OrdinalIgnoreCase))
+        {
+            await DisplayAlertAsync("Invalid email address", "Enter a valid email address and try again.", "OK");
+            return;
+        }
+
+        string archivePath;
+        try
+        {
+            archivePath = await _pictureLibrary.CreateBackupArchiveAsync();
+        }
+        catch (IOException ex)
+        {
+            await DisplayAlertAsync("Could not create backup", ex.Message, "OK");
+            return;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            await DisplayAlertAsync("Could not create backup", ex.Message, "OK");
+            return;
+        }
+        catch (InvalidOperationException ex)
+        {
+            await DisplayAlertAsync("Could not create backup", ex.Message, "OK");
+            return;
+        }
+
+        try
+        {
+            var message = new EmailMessage
+            {
+                Subject = "PictureQs backup",
+                Body = "Attached is a backup of the pictures and JSON files stored by PictureQs.",
+                To = new List<string> { parsedAddress.Address },
+                Attachments = new List<EmailAttachment> { new(archivePath) }
+            };
+            await Email.Default.ComposeAsync(message);
+        }
+        catch (FeatureNotSupportedException ex)
+        {
+            await ShareBackupAsync(archivePath, emailAddress, ex.Message);
+        }
+        catch (FeatureNotEnabledException ex)
+        {
+            await ShareBackupAsync(archivePath, emailAddress, ex.Message);
+        }
+        catch (NotSupportedException ex)
+        {
+            await ShareBackupAsync(archivePath, emailAddress, ex.Message);
+        }
+        catch (IOException ex)
+        {
+            await DisplayAlertAsync("Could not open email", ex.Message, "OK");
+        }
+        catch (InvalidOperationException ex)
+        {
+            await DisplayAlertAsync("Could not open email", ex.Message, "OK");
+        }
+    }
+
+    private async Task ShareBackupAsync(string archivePath, string emailAddress, string emailError)
+    {
+        try
+        {
+            await Share.Default.RequestAsync(new ShareFileRequest
+            {
+                Title = "Share PictureQs backup",
+                File = new ShareFile(archivePath)
+            });
+            await DisplayAlertAsync(
+                "Choose an email app",
+                $"The email composer is unavailable ({emailError}). Choose an email app in the sharing menu and enter {emailAddress} as the recipient.",
+                "OK");
+        }
+        catch (FeatureNotSupportedException ex)
+        {
+            await DisplayAlertAsync(
+                "Backup sharing unavailable",
+                $"Email is unavailable ({emailError}), and sharing is not supported on this device: {ex.Message}",
+                "OK");
+        }
+        catch (NotSupportedException ex)
+        {
+            await DisplayAlertAsync(
+                "Backup sharing unavailable",
+                $"Email is unavailable ({emailError}), and sharing is not supported on this device: {ex.Message}",
+                "OK");
+        }
+        catch (InvalidOperationException ex)
+        {
+            await DisplayAlertAsync(
+                "Backup sharing unavailable",
+                $"Email is unavailable ({emailError}), and the backup could not be shared: {ex.Message}",
+                "OK");
         }
     }
 

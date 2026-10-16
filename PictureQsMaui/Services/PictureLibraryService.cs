@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Text.Json;
 
 namespace PictureQsMaui.Services;
@@ -125,6 +126,54 @@ public sealed class PictureLibraryService
         return _targetFileNames.TryGetValue(pictureFileName, out var targetsFileName)
             ? targetsFileName
             : Path.GetFileNameWithoutExtension(pictureFileName);
+    }
+
+    public async Task<string> CreateBackupArchiveAsync()
+    {
+        var filesToBackUp = Directory.EnumerateFiles(_folderPath)
+            .Where(path =>
+                IsPictureFile(path) ||
+                Path.GetExtension(path).Equals(".json", StringComparison.OrdinalIgnoreCase))
+            .OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (filesToBackUp.Count == 0)
+        {
+            throw new InvalidOperationException("There are no picture or JSON files to back up.");
+        }
+
+        var archivePath = Path.Combine(
+            FileSystem.CacheDirectory,
+            $"PictureQs-backup-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.zip");
+
+        try
+        {
+            await using var archiveStream = new FileStream(
+                archivePath,
+                FileMode.CreateNew,
+                FileAccess.ReadWrite,
+                FileShare.None);
+            using var archive = new ZipArchive(archiveStream, ZipArchiveMode.Create, leaveOpen: true);
+
+            foreach (var filePath in filesToBackUp)
+            {
+                var entry = archive.CreateEntry(Path.GetFileName(filePath), CompressionLevel.Optimal);
+                await using var source = File.OpenRead(filePath);
+                await using var destination = entry.Open();
+                await source.CopyToAsync(destination);
+            }
+        }
+        catch
+        {
+            if (File.Exists(archivePath))
+            {
+                File.Delete(archivePath);
+            }
+
+            throw;
+        }
+
+        return archivePath;
     }
 
     public async Task<string> ImportPictureAsync(FileResult photo, string pictureName, string targetsFileName)
