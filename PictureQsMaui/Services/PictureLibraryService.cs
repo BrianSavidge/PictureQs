@@ -144,7 +144,7 @@ public sealed class PictureLibraryService
 
         var archivePath = Path.Combine(
             FileSystem.CacheDirectory,
-            $"PictureQs-backup-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.zip");
+            $"PictureQs-backup-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.PictureQs.zip");
 
         try
         {
