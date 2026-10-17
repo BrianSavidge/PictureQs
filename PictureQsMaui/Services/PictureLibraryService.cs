@@ -144,7 +144,7 @@ public sealed class PictureLibraryService
 
         var archivePath = Path.Combine(
             FileSystem.CacheDirectory,
-            $"PictureQs-backup-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.PictureQs.zip");
+            $"PictureQs-backup-{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid():N}.zip");
 
         try
         {
@@ -174,6 +174,123 @@ public sealed class PictureLibraryService
         }
 
         return archivePath;
+    }
+
+    public async Task RestoreBackupArchiveAsync(Stream archiveSource)
+    {
+        var temporaryFolder = Path.Combine(FileSystem.CacheDirectory, $"restore-{Guid.NewGuid():N}");
+        var archivePath = Path.Combine(FileSystem.CacheDirectory, $"restore-{Guid.NewGuid():N}.zip");
+        Directory.CreateDirectory(temporaryFolder);
+
+        try
+        {
+            await using (var archiveFile = File.Create(archivePath))
+            {
+                await archiveSource.CopyToAsync(archiveFile);
+            }
+
+            var restoredFiles = new List<string>();
+            var restoredFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            using (var archive = ZipFile.OpenRead(archivePath))
+            {
+                foreach (var entry in archive.Entries)
+                {
+                    var fileName = entry.FullName;
+                    if (string.IsNullOrWhiteSpace(fileName) ||
+                        fileName.Contains('/') ||
+                        fileName.Contains('\\') ||
+                        !string.Equals(fileName, Path.GetFileName(fileName), StringComparison.Ordinal))
+                    {
+                        throw new InvalidDataException("The backup contains a file path that is not allowed.");
+                    }
+
+                    fileName = GetSafeFileName(fileName);
+                    if (!IsPictureFile(fileName) &&
+                        !Path.GetExtension(fileName).Equals(".json", StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new InvalidDataException($"The backup contains an unsupported file: '{fileName}'.");
+                    }
+
+                    if (!restoredFileNames.Add(fileName))
+                    {
+                        throw new InvalidDataException($"The backup contains more than one file named '{fileName}'.");
+                    }
+
+                    var stagedPath = Path.Combine(temporaryFolder, fileName);
+                    await using var source = entry.Open();
+                    await using var destination = new FileStream(
+                        stagedPath,
+                        FileMode.CreateNew,
+                        FileAccess.Write,
+                        FileShare.None);
+                    await source.CopyToAsync(destination);
+                    restoredFiles.Add(stagedPath);
+                }
+            }
+
+            var pictureFileNames = restoredFileNames.Where(IsPictureFile).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (pictureFileNames.Count == 0)
+            {
+                throw new InvalidDataException("The backup does not contain any supported pictures.");
+            }
+
+            var settingsPath = Path.Combine(temporaryFolder, SettingsFileName);
+            if (File.Exists(settingsPath))
+            {
+                var settingsJson = await File.ReadAllTextAsync(settingsPath);
+                var settings = JsonSerializer.Deserialize<PictureLibrarySettings>(settingsJson);
+                if (settings?.TargetFileNames is null ||
+                    string.IsNullOrWhiteSpace(settings.SelectedPictureFileName) ||
+                    !pictureFileNames.Contains(GetSafeFileName(settings.SelectedPictureFileName)))
+                {
+                    throw new InvalidDataException("The backup contains invalid picture library settings.");
+                }
+
+                foreach (var (pictureFileName, targetFileName) in settings.TargetFileNames)
+                {
+                    if (string.IsNullOrWhiteSpace(pictureFileName) ||
+                        string.IsNullOrWhiteSpace(targetFileName) ||
+                        !pictureFileNames.Contains(GetSafeFileName(pictureFileName)))
+                    {
+                        throw new InvalidDataException("The backup contains invalid picture library settings.");
+                    }
+
+                    GetSafeFileName(targetFileName);
+                }
+            }
+
+            Directory.CreateDirectory(_folderPath);
+            foreach (var stagedPath in restoredFiles)
+            {
+                File.Copy(stagedPath, Path.Combine(_folderPath, Path.GetFileName(stagedPath)), overwrite: true);
+            }
+
+            _targetFileNames.Clear();
+            SelectedPictureFileName = "picture.png";
+            await InitializeAsync();
+
+            var availablePictureNames = GetPictureFileNames();
+            if (!availablePictureNames.Contains(SelectedPictureFileName, StringComparer.OrdinalIgnoreCase))
+            {
+                var targetFileNames = availablePictureNames.ToDictionary(
+                    fileName => fileName,
+                    GetTargetsFileName,
+                    StringComparer.OrdinalIgnoreCase);
+                await SaveSettingsAsync(availablePictureNames[0], targetFileNames);
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(temporaryFolder))
+            {
+                Directory.Delete(temporaryFolder, recursive: true);
+            }
+
+            if (File.Exists(archivePath))
+            {
+                File.Delete(archivePath);
+            }
+        }
     }
 
     public async Task<string> ImportPictureAsync(FileResult photo, string pictureName, string targetsFileName)

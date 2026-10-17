@@ -5,16 +5,9 @@
              Title="Pictures">
 
     <Grid Padding="16"
-          RowDefinitions="Auto,*,Auto"
+          RowDefinitions="*,Auto"
           RowSpacing="12">
-        <HorizontalStackLayout Spacing="8">
-            <Button Text="Choose picture from gallery"
-                    Clicked="OnAddPictureClicked" />
-            <Button Text="Backup"
-                    Clicked="OnBackupClicked" />
-        </HorizontalStackLayout>
-
-        <CollectionView Grid.Row="1"
+        <CollectionView Grid.Row="0"
                         ItemsSource="{Binding Pictures}">
             <CollectionView.ItemTemplate>
                 <DataTemplate>
@@ -44,13 +37,28 @@
             </CollectionView.ItemTemplate>
         </CollectionView>
 
-        <HorizontalStackLayout Grid.Row="2"
-                               HorizontalOptions="End"
-                               Spacing="8">
-            <Button Text="Cancel"
-                    Clicked="OnCancelClicked" />
-            <Button Text="OK"
-                    Clicked="OnOkClicked" />
-        </HorizontalStackLayout>
+        <Grid Grid.Row="1"
+              ColumnDefinitions="*,Auto"
+              ColumnSpacing="24">
+            <HorizontalStackLayout Spacing="8"
+                                   VerticalOptions="Center">
+                <Button Text="Add picture from gallery"
+                        Clicked="OnAddPictureClicked" />
+                <Button Text="Backup"
+                        Clicked="OnBackupClicked" />
+                <Button Text="Restore"
+                        Clicked="OnRestoreClicked" />
+            </HorizontalStackLayout>
+
+            <HorizontalStackLayout Grid.Column="1"
+                                   HorizontalOptions="End"
+                                   VerticalOptions="Center"
+                                   Spacing="8">
+                <Button Text="Cancel"
+                        Clicked="OnCancelClicked" />
+                <Button Text="OK"
+                        Clicked="OnOkClicked" />
+            </HorizontalStackLayout>
+        </Grid>
     </Grid>
 </ContentPage>

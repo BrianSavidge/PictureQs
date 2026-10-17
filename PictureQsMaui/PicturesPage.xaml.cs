@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Net.Mail;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using PictureQsMaui.Services;
 
 namespace PictureQsMaui;
@@ -9,6 +10,7 @@ namespace PictureQsMaui;
 public partial class PicturesPage : ContentPage
 {
     private readonly PictureLibraryService _pictureLibrary;
+    private readonly DownloadBackupService _downloadBackups = new();
     private string _activePictureFileName;
 
     public ObservableCollection<PictureListItem> Pictures { get; } = new();
@@ -113,6 +115,116 @@ public partial class PicturesPage : ContentPage
         catch (InvalidOperationException ex)
         {
             await DisplayAlertAsync("Could not open email", ex.Message, "OK");
+        }
+    }
+
+    private async void OnRestoreClicked(object? sender, EventArgs e)
+    {
+        try
+        {
+            var backups = await _downloadBackups.GetArchivesAsync();
+            if (backups.Count == 0)
+            {
+                await DisplayAlertAsync(
+                    "No backups found",
+                    "There are no ZIP files whose names start with 'PictureQs-backup' in the Downloads folder.",
+                    "OK");
+                return;
+            }
+
+            BackupArchiveFile? selectedBackup;
+            if (backups.Count == 1)
+            {
+                selectedBackup = backups[0];
+            }
+            else
+            {
+                var archiveNames = backups.Select(backup => backup.Name).ToArray();
+                var selectedName = await DisplayActionSheetAsync(
+                    "Choose a backup from Downloads",
+                    "Cancel",
+                    null,
+                    archiveNames);
+                selectedBackup = backups.FirstOrDefault(
+                    backup => string.Equals(backup.Name, selectedName, StringComparison.Ordinal));
+            }
+
+            if (selectedBackup is null)
+            {
+                return;
+            }
+
+            var confirmed = await DisplayAlertAsync(
+                "Restore backup",
+                $"Restore '{selectedBackup.Name}'? Matching pictures and JSON files in this app will be overwritten.",
+                "Restore",
+                "Cancel");
+            if (!confirmed)
+            {
+                return;
+            }
+
+            await using (var backupStream = await _downloadBackups.OpenArchiveAsync(selectedBackup))
+            {
+                await _pictureLibrary.RestoreBackupArchiveAsync(backupStream);
+            }
+
+            _activePictureFileName = _pictureLibrary.SelectedPictureFileName;
+            Confirmed = true;
+            SelectedPictureFileName = _activePictureFileName;
+            LoadPictures(_activePictureFileName);
+
+            var deleteBackup = await DisplayAlertAsync(
+                "Delete downloaded backup?",
+                $"The restore is complete. Delete '{selectedBackup.Name}' from Downloads?",
+                "Delete",
+                "Keep");
+            if (deleteBackup)
+            {
+                try
+                {
+                    await _downloadBackups.DeleteArchiveAsync(selectedBackup);
+                }
+                catch (IOException ex)
+                {
+                    await DisplayAlertAsync("Could not delete backup", ex.Message, "OK");
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    await DisplayAlertAsync("Could not delete backup", ex.Message, "OK");
+                }
+                catch (InvalidOperationException ex)
+                {
+                    await DisplayAlertAsync("Could not delete backup", ex.Message, "OK");
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (InvalidDataException ex)
+        {
+            await DisplayAlertAsync("Invalid backup", ex.Message, "OK");
+        }
+        catch (JsonException ex)
+        {
+            await DisplayAlertAsync("Invalid backup", ex.Message, "OK");
+        }
+        catch (IOException ex)
+        {
+            await DisplayAlertAsync("Could not restore backup", ex.Message, "OK");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            await DisplayAlertAsync("Could not restore backup", ex.Message, "OK");
+        }
+        catch (InvalidOperationException ex)
+        {
+            await DisplayAlertAsync("Could not restore backup", ex.Message, "OK");
+        }
+        catch (FeatureNotSupportedException ex)
+        {
+            await DisplayAlertAsync("Restore unavailable", ex.Message, "OK");
         }
     }
 
