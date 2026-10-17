@@ -28,12 +28,20 @@
                     Clicked="OnSyncClicked" />
         </Grid>
 
-        <HorizontalStackLayout HorizontalOptions="End"
-                               Spacing="8">
-            <Button Text="Cancel"
-                    Clicked="OnCancelClicked" />
-            <Button Text="Accept"
-                    Clicked="OnAcceptClicked" />
-        </HorizontalStackLayout>
+        <Grid ColumnDefinitions="*,Auto">
+            <Button x:Name="DeletePictureButton"
+                    Text="Delete Picture"
+                    TextColor="DarkRed"
+                    HorizontalOptions="Start"
+                    Clicked="OnDeletePictureClicked" />
+            <HorizontalStackLayout Grid.Column="1"
+                                   HorizontalOptions="End"
+                                   Spacing="8">
+                <Button Text="Cancel"
+                        Clicked="OnCancelClicked" />
+                <Button Text="Accept"
+                        Clicked="OnAcceptClicked" />
+            </HorizontalStackLayout>
+        </Grid>
     </VerticalStackLayout>
 </ContentPage>

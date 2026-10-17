@@ -14,7 +14,7 @@
                     <Border Margin="0,0,0,8"
                             Padding="10"
                             Stroke="#D0D0D0">
-                        <Grid ColumnDefinitions="*,160,Auto,Auto"
+                        <Grid ColumnDefinitions="*,160,Auto"
                               ColumnSpacing="10">
                             <RadioButton Content="{Binding PictureName}"
                                          IsChecked="{Binding IsSelected, Mode=TwoWay}"
@@ -25,32 +25,34 @@
                                    VerticalOptions="Center"
                                    ClearButtonVisibility="WhileEditing" />
                             <Button Grid.Column="2"
-                                    Text="Edit names"
+                                    Text="Edit"
                                     Clicked="OnEditPictureNamesClicked" />
-                            <Button Grid.Column="3"
-                                    Text="Delete"
-                                    TextColor="DarkRed"
-                                    Clicked="OnDeletePictureClicked" />
                         </Grid>
                     </Border>
                 </DataTemplate>
             </CollectionView.ItemTemplate>
         </CollectionView>
 
-        <Grid Grid.Row="1"
+        <Grid x:Name="FooterLayout"
+              Grid.Row="1"
               ColumnDefinitions="*,Auto"
-              ColumnSpacing="24">
+              ColumnSpacing="24"
+              SizeChanged="OnFooterSizeChanged">
             <HorizontalStackLayout Spacing="8"
                                    VerticalOptions="Center">
-                <Button Text="Add picture from gallery"
+                <Button x:Name="AddPictureButton"
+                        Text="Add picture"
                         Clicked="OnAddPictureClicked" />
-                <Button Text="Backup"
+                <Button x:Name="BackupButton"
+                        Text="Backup"
                         Clicked="OnBackupClicked" />
-                <Button Text="Restore"
+                <Button x:Name="RestoreButton"
+                        Text="Restore"
                         Clicked="OnRestoreClicked" />
             </HorizontalStackLayout>
 
-            <HorizontalStackLayout Grid.Column="1"
+            <HorizontalStackLayout x:Name="DialogActions"
+                                   Grid.Column="1"
                                    HorizontalOptions="End"
                                    VerticalOptions="Center"
                                    Spacing="8">

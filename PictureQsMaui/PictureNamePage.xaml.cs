@@ -6,6 +6,7 @@ public partial class PictureNamePage : ContentPage
     private PictureImportNames? _result;
 
     public Task<PictureImportNames?> Completion => _completion.Task;
+    public bool DeleteRequested { get; private set; }
 
     public PictureNamePage(
         string suggestedPictureName,
@@ -24,6 +25,7 @@ public partial class PictureNamePage : ContentPage
             existingTargetsFileNames ?? Array.Empty<string>(),
             StringComparer.OrdinalIgnoreCase);
         _hasCurrentTargetsFile = hasCurrentTargetsFile;
+        DeletePictureButton.IsVisible = hasCurrentTargetsFile;
     }
 
     private readonly HashSet<string> _existingTargetsFileNames;
@@ -75,6 +77,22 @@ public partial class PictureNamePage : ContentPage
 
     private async void OnCancelClicked(object? sender, EventArgs e)
     {
+        await Navigation.PopModalAsync();
+    }
+
+    private async void OnDeletePictureClicked(object? sender, EventArgs e)
+    {
+        var confirmed = await DisplayAlertAsync(
+            "Delete picture",
+            $"Delete '{PictureNameEntry.Text}'?",
+            "Delete Picture",
+            "Cancel");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        DeleteRequested = true;
         await Navigation.PopModalAsync();
     }
 }

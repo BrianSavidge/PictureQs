@@ -43,6 +43,30 @@ public partial class PicturesPage : ContentPage
         }
     }
 
+    private void OnFooterSizeChanged(object? sender, EventArgs e)
+    {
+        const double buttonSpacing = 8;
+        var addPictureWidth = MeasureButtonWidth(AddPictureButton, "Add picture");
+        var backupWidth = MeasureButtonWidth(BackupButton, "Backup");
+        var restoreWidth = MeasureButtonWidth(RestoreButton, "Restore");
+        var pictureActionsWidth = addPictureWidth + backupWidth + restoreWidth + buttonSpacing * 2;
+        var dialogActionsWidth = DialogActions.Measure(double.PositiveInfinity, double.PositiveInfinity).Width;
+        var groupsWouldOverlap = pictureActionsWidth + dialogActionsWidth + FooterLayout.ColumnSpacing > FooterLayout.Width;
+
+        AddPictureButton.Text = groupsWouldOverlap ? "Add" : "Add picture";
+        BackupButton.Text = groupsWouldOverlap ? "Bak" : "Backup";
+        RestoreButton.Text = groupsWouldOverlap ? "Res" : "Restore";
+    }
+
+    private static double MeasureButtonWidth(Button button, string text)
+    {
+        var originalText = button.Text;
+        button.Text = text;
+        var width = button.Measure(double.PositiveInfinity, double.PositiveInfinity).Width;
+        button.Text = originalText;
+        return width;
+    }
+
     private async void OnBackupClicked(object? sender, EventArgs e)
     {
         var enteredEmail = await DisplayPromptAsync(
@@ -351,6 +375,12 @@ public partial class PicturesPage : ContentPage
             hasCurrentTargetsFile: true);
         await Navigation.PushModalAsync(new NavigationPage(namePage));
         var names = await namePage.Completion;
+        if (namePage.DeleteRequested)
+        {
+            await DeletePictureAsync(picture);
+            return;
+        }
+
         if (names is null)
         {
             return;
@@ -404,26 +434,11 @@ public partial class PicturesPage : ContentPage
         }
     }
 
-    private async void OnDeletePictureClicked(object? sender, EventArgs e)
+    private async Task DeletePictureAsync(PictureListItem picture)
     {
-        if (sender is not Button { BindingContext: PictureListItem picture })
-        {
-            return;
-        }
-
         if (Pictures.Count <= 1)
         {
             await DisplayAlertAsync("Cannot delete picture", "At least one picture must remain in the library.", "OK");
-            return;
-        }
-
-        var confirmed = await DisplayAlertAsync(
-            "Delete picture",
-            $"Delete '{picture.PictureName}'?",
-            "Delete",
-            "Cancel");
-        if (!confirmed)
-        {
             return;
         }
 
