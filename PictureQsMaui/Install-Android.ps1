@@ -7,7 +7,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $projectPath = Join-Path $PSScriptRoot "PictureQsMaui.csproj"
-$applicationId = "com.companyname.pictureqsmaui"
+$applicationId = "com.BSavidgeDevelopment.pictureqs"
 
 if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
     throw "The .NET SDK was not found on PATH."

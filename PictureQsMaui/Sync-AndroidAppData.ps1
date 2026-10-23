@@ -22,7 +22,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$applicationId = "com.companyname.pictureqsmaui"
+$applicationId = "com.BSavidgeDevelopment.pictureqs"
 
 $sdkDirectory = $env:ANDROID_HOME
 if ([string]::IsNullOrWhiteSpace($sdkDirectory)) {
