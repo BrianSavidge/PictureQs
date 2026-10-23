@@ -16,9 +16,10 @@
                Placeholder="Name (without file extension)"
                ClearButtonVisibility="WhileEditing" />
 
-        <Label Text="JSON file name"
+        <Label x:Name="TargetsFileNameLabel"
+               Text="JSON file name"
                FontAttributes="Bold" />
-        <Grid ColumnDefinitions="*,Auto"
+        <Grid ColumnDefinitions="*,Auto,Auto"
               ColumnSpacing="8">
             <Entry x:Name="TargetsFileNameEntry"
                    Placeholder="Name (without .json)"
@@ -26,6 +27,9 @@
             <Button Grid.Column="1"
                     Text="Sync"
                     Clicked="OnSyncClicked" />
+            <Button Grid.Column="2"
+                    Text="Search"
+                    Clicked="OnSearchClicked" />
         </Grid>
 
         <Grid ColumnDefinitions="*,Auto">

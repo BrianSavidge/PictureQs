@@ -106,6 +106,19 @@ public sealed class PictureLibraryService
             .ToList();
     }
 
+    public IReadOnlyList<string> GetTargetsJsonFileNames()
+    {
+        return Directory.EnumerateFiles(_folderPath)
+            .Where(path =>
+                Path.GetExtension(path).Equals(".json", StringComparison.OrdinalIgnoreCase) &&
+                !Path.GetFileName(path).Equals(SettingsFileName, StringComparison.OrdinalIgnoreCase))
+            .Select(Path.GetFileNameWithoutExtension)
+            .Where(fileName => !string.IsNullOrWhiteSpace(fileName))
+            .Select(fileName => fileName!)
+            .OrderBy(fileName => fileName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
     public string GetPicturePath(string pictureFileName)
     {
         return Path.Combine(_folderPath, GetSafeFileName(pictureFileName));

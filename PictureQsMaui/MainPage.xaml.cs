@@ -22,6 +22,7 @@ public partial class MainPage : ContentPage
     private PointOfInterest? _selectedPoi;
     private bool _isRandomMode;
     private bool _isUpdatingPoiList;
+    private bool _reloadPictureAfterPicturesPage;
     private int _imagePixelWidth;
     private int _imagePixelHeight;
     private double _zoomLevel = MinZoom;
@@ -47,6 +48,20 @@ public partial class MainPage : ContentPage
 #endif
 
         Loaded += OnPageLoaded;
+        LoadPointsOfInterest();
+    }
+
+    protected override async void OnAppearing()
+    {
+        base.OnAppearing();
+        if (!_reloadPictureAfterPicturesPage)
+        {
+            return;
+        }
+
+        _reloadPictureAfterPicturesPage = false;
+        _activePictureFileName = _pictureLibrary.SelectedPictureFileName;
+        await LoadActivePictureAsync();
         LoadPointsOfInterest();
     }
 
@@ -119,27 +134,9 @@ public partial class MainPage : ContentPage
 
     private async void OnPicturesClicked(object? sender, EventArgs e)
     {
+        _reloadPictureAfterPicturesPage = true;
         var page = new PicturesPage(_pictureLibrary, _activePictureFileName);
-        page.Disappearing += OnPicturesPageDisappearing;
         await Navigation.PushModalAsync(new NavigationPage(page));
-    }
-
-    private async void OnPicturesPageDisappearing(object? sender, EventArgs e)
-    {
-        if (sender is not PicturesPage page)
-        {
-            return;
-        }
-
-        page.Disappearing -= OnPicturesPageDisappearing;
-        if (!page.Confirmed || page.SelectedPictureFileName is null)
-        {
-            return;
-        }
-
-        _activePictureFileName = page.SelectedPictureFileName;
-        await LoadActivePictureAsync();
-        LoadPointsOfInterest();
     }
 
     private void UpdatePoiList()

@@ -308,7 +308,8 @@ public partial class PicturesPage : ContentPage
                 var namePage = new PictureNamePage(
                     Path.GetFileNameWithoutExtension(photo.FileName),
                     previewSource: ImageSource.FromFile(photo.FullPath),
-                    existingTargetsFileNames: existingTargetFileNames);
+                    existingTargetsFileNames: existingTargetFileNames,
+                    availableTargetsFileNames: _pictureLibrary.GetTargetsJsonFileNames());
                 await Navigation.PushModalAsync(new NavigationPage(namePage));
                 var names = await namePage.Completion;
                 if (names is null)
@@ -372,7 +373,8 @@ public partial class PicturesPage : ContentPage
             Pictures
                 .Where(item => !ReferenceEquals(item, picture))
                 .Select(item => item.TargetsFileName),
-            hasCurrentTargetsFile: true);
+            hasCurrentTargetsFile: true,
+            availableTargetsFileNames: _pictureLibrary.GetTargetsJsonFileNames());
         await Navigation.PushModalAsync(new NavigationPage(namePage));
         var names = await namePage.Completion;
         if (namePage.DeleteRequested)

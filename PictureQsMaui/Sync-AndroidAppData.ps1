@@ -11,10 +11,16 @@ Restore copies the newest snapshot back to the app's private files directory on 
 
 .EXAMPLE
 .\Sync-AndroidAppData.ps1 -Mode Restore -DeviceSerial DEVICE_SERIAL
+
+.EXAMPLE
+.\Sync-AndroidAppData.ps1 -ApplicationId com.companyname.pictureqsmaui
 #>
 param(
     [ValidateSet("Download", "Restore")]
     [string]$Mode = "Download",
+
+    [ValidatePattern("^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)+$")]
+    [string]$ApplicationId = "com.BSavidgeDevelopment.pictureqs",
 
     [string]$DeviceSerial,
 
@@ -22,7 +28,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$applicationId = "com.BSavidgeDevelopment.pictureqs"
+$applicationId = $ApplicationId
 
 $sdkDirectory = $env:ANDROID_HOME
 if ([string]::IsNullOrWhiteSpace($sdkDirectory)) {
