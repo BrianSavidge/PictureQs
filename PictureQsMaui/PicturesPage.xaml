@@ -14,17 +14,25 @@
                     <Border Margin="0,0,0,8"
                             Padding="10"
                             Stroke="#D0D0D0">
-                        <Grid ColumnDefinitions="*,160,Auto"
+                        <Grid ColumnDefinitions="Auto,64,*,160,Auto"
                               ColumnSpacing="10">
-                            <RadioButton Content="{Binding PictureName}"
-                                         IsChecked="{Binding IsSelected, Mode=TwoWay}"
+                            <RadioButton IsChecked="{Binding IsSelected, Mode=TwoWay}"
                                          VerticalOptions="Center" />
-                            <Entry Grid.Column="1"
+                            <Image Grid.Column="1"
+                                   Source="{Binding ThumbnailSource}"
+                                   WidthRequest="64"
+                                   HeightRequest="48"
+                                   Aspect="AspectFit"
+                                   VerticalOptions="Center" />
+                            <Label Grid.Column="2"
+                                   Text="{Binding PictureName}"
+                                   VerticalOptions="Center" />
+                            <Entry Grid.Column="3"
                                    Text="{Binding TargetsFileName, Mode=TwoWay}"
                                    Placeholder="Targets name (no .json)"
                                    VerticalOptions="Center"
                                    ClearButtonVisibility="WhileEditing" />
-                            <Button Grid.Column="2"
+                            <Button Grid.Column="4"
                                     Text="Edit"
                                     Clicked="OnEditPictureNamesClicked" />
                         </Grid>

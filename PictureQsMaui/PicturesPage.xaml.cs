@@ -33,6 +33,7 @@ public partial class PicturesPage : ContentPage
             .Select(pictureFileName => new PictureListItem(
                 pictureFileName,
                 _pictureLibrary.GetTargetsFileName(pictureFileName),
+                ImageSource.FromFile(_pictureLibrary.GetPicturePath(pictureFileName)),
                 string.Equals(pictureFileName, selectedPictureFileName, StringComparison.OrdinalIgnoreCase)))
             .ToList();
 
@@ -546,6 +547,7 @@ public partial class PicturesPage : ContentPage
 
         public string PictureFileName { get; }
         public string PictureName => Path.GetFileNameWithoutExtension(PictureFileName);
+        public ImageSource ThumbnailSource { get; }
         public string TargetsFileName
         {
             get => _targetsFileName;
@@ -590,10 +592,15 @@ public partial class PicturesPage : ContentPage
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
-        public PictureListItem(string pictureFileName, string targetsFileName, bool isSelected)
+        public PictureListItem(
+            string pictureFileName,
+            string targetsFileName,
+            ImageSource thumbnailSource,
+            bool isSelected)
         {
             PictureFileName = pictureFileName;
             _targetsFileName = targetsFileName;
+            ThumbnailSource = thumbnailSource;
             _isSelected = isSelected;
         }
 
