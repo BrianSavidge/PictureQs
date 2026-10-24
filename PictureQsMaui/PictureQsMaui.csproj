@@ -48,6 +48,7 @@
 	<ItemGroup>
 		<MauiAsset Include="..\picture.png" LogicalName="picture.png" />
 		<MauiAsset Include="picture-Blanked.png" LogicalName="picture-Blanked.png" />
+		<MauiAsset Include="poi.json" LogicalName="poi.json" />
 	</ItemGroup>
 
 	<ItemGroup>

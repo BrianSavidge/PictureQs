@@ -14,7 +14,7 @@
                     <Border Margin="0,0,0,8"
                             Padding="10"
                             Stroke="#D0D0D0">
-                        <Grid ColumnDefinitions="Auto,64,*,160,Auto"
+                        <Grid ColumnDefinitions="Auto,64,*,Auto"
                               ColumnSpacing="10">
                             <RadioButton IsChecked="{Binding IsSelected, Mode=TwoWay}"
                                          VerticalOptions="Center" />
@@ -27,12 +27,7 @@
                             <Label Grid.Column="2"
                                    Text="{Binding PictureName}"
                                    VerticalOptions="Center" />
-                            <Entry Grid.Column="3"
-                                   Text="{Binding TargetsFileName, Mode=TwoWay}"
-                                   Placeholder="Targets name (no .json)"
-                                   VerticalOptions="Center"
-                                   ClearButtonVisibility="WhileEditing" />
-                            <Button Grid.Column="4"
+                            <Button Grid.Column="3"
                                     Text="Edit"
                                     Clicked="OnEditPictureNamesClicked" />
                         </Grid>

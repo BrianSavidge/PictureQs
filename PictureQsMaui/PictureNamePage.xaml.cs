@@ -57,12 +57,15 @@ public partial class PictureNamePage : ContentPage
     {
         if (_availableTargetsFileNames.Length == 0)
         {
-            await DisplayAlertAsync("No JSON files found", "There are no JSON files available to choose.", "OK");
+            await DisplayAlertAsync(
+                "No Points of Interest",
+                "There are no Points of Interest available to choose.",
+                "OK");
             return;
         }
 
         var selectedFileName = await DisplayActionSheetAsync(
-            "Choose a JSON file",
+            "Choose a point of interest file",
             "Cancel",
             null,
             _availableTargetsFileNames);
@@ -78,7 +81,7 @@ public partial class PictureNamePage : ContentPage
         if (string.IsNullOrWhiteSpace(PictureNameEntry.Text) ||
             string.IsNullOrWhiteSpace(TargetsFileNameEntry.Text))
         {
-            await DisplayAlertAsync("Names required", "Enter a name for the picture and JSON file.", "OK");
+            await DisplayAlertAsync("Names required", "Enter a name for the picture and points of interest files.", "OK");
             return;
         }
 
@@ -87,10 +90,10 @@ public partial class PictureNamePage : ContentPage
         if (reuseExistingTargetsFile)
         {
             var useExisting = await DisplayAlertAsync(
-                "JSON file already exists",
+                "Point of Interest file already exists",
                 _hasCurrentTargetsFile
-                    ? $"Use the existing '{targetsFileName}.json' file and delete this picture's current JSON file if no other picture uses it?"
-                    : $"Use the existing '{targetsFileName}.json' file for this picture?",
+                    ? $"Use the existing '{targetsFileName}' file and delete this picture's current Point of Interest file if no other picture uses it and it has one?"
+                    : $"Use the existing '{targetsFileName}' file for this picture?",
                 "Use existing",
                 "Change name");
             if (!useExisting)

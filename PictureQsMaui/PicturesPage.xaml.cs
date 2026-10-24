@@ -115,7 +115,7 @@ public partial class PicturesPage : ContentPage
             var message = new EmailMessage
             {
                 Subject = "PictureQs backup",
-                Body = "Attached is a backup of the pictures and JSON files stored by PictureQs.",
+                Body = "Attached is a backup of the pictures and point of interest files stored by PictureQs.",
                 To = new List<string> { parsedAddress.Address },
                 Attachments = new List<EmailAttachment> { new(archivePath) }
             };
@@ -181,7 +181,7 @@ public partial class PicturesPage : ContentPage
 
             var confirmed = await DisplayAlertAsync(
                 "Restore backup",
-                $"Restore '{selectedBackup.Name}'? Matching pictures and JSON files in this app will be overwritten.",
+                $"Restore '{selectedBackup.Name}'? Matching pictures and point of interest files in this app will be overwritten.",
                 "Restore",
                 "Cancel");
             if (!confirmed)

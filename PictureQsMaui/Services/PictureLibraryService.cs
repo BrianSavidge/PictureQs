@@ -44,13 +44,13 @@ public sealed class PictureLibraryService
             var defaultPicturePath = Path.Combine(_folderPath, "picture.png");
             if (!File.Exists(defaultPicturePath) && !GetPictureFileNames().Any())
             {
-                await CopyBundledPictureAsync("picture.png", defaultPicturePath);
+                await CopyBundledAssetAsync("picture.png", defaultPicturePath);
             }
 
             var blankedPicturePath = Path.Combine(_folderPath, "picture-Blanked.png");
             if (!File.Exists(blankedPicturePath))
             {
-                await CopyBundledPictureAsync("picture-Blanked.png", blankedPicturePath);
+                await CopyBundledAssetAsync("picture-Blanked.png", blankedPicturePath);
             }
         }
 
@@ -60,14 +60,20 @@ public sealed class PictureLibraryService
             SelectedPictureFileName = settings.SelectedPictureFileName;
         }
 
-        if (File.Exists(Path.Combine(_folderPath, "poi.json")) == false)
+        var bundledTargetsPath = Path.Combine(_folderPath, "poi.json");
+        if (!File.Exists(bundledTargetsPath))
         {
             var legacyTargetsPath = Path.Combine(AppContext.BaseDirectory, "poi.json");
             if (File.Exists(legacyTargetsPath) &&
-                !string.Equals(Path.GetFullPath(legacyTargetsPath), Path.GetFullPath(Path.Combine(_folderPath, "poi.json")), StringComparison.OrdinalIgnoreCase))
+                !string.Equals(Path.GetFullPath(legacyTargetsPath), Path.GetFullPath(bundledTargetsPath), StringComparison.OrdinalIgnoreCase))
             {
-                File.Copy(legacyTargetsPath, Path.Combine(_folderPath, "poi.json"));
+                File.Copy(legacyTargetsPath, bundledTargetsPath);
             }
+        }
+
+        if (!File.Exists(bundledTargetsPath))
+        {
+            await CopyBundledAssetAsync("poi.json", bundledTargetsPath);
         }
 
         _targetFileNames.TryAdd("picture.png", "poi");
@@ -152,7 +158,7 @@ public sealed class PictureLibraryService
 
         if (filesToBackUp.Count == 0)
         {
-            throw new InvalidOperationException("There are no picture or JSON files to back up.");
+            throw new InvalidOperationException("There are no picture or point of interest files to back up.");
         }
 
         var archivePath = Path.Combine(
@@ -374,7 +380,7 @@ public sealed class PictureLibraryService
         var existingTargetsFile = targetsFileNameChanged && File.Exists(renamedTargetsPath);
         if (existingTargetsFile && !reuseExistingTargetsFile)
         {
-            throw new IOException($"A JSON file named '{safeTargetsFileName}.json' already exists.");
+            throw new IOException($"A point of interest file named '{safeTargetsFileName}.json' already exists.");
         }
 
         try
@@ -536,7 +542,7 @@ public sealed class PictureLibraryService
         SelectedPictureFileName = selectedPictureFileName;
     }
 
-    private static async Task CopyBundledPictureAsync(string assetFileName, string destinationPath)
+    private static async Task CopyBundledAssetAsync(string assetFileName, string destinationPath)
     {
         await using var source = await FileSystem.OpenAppPackageFileAsync(assetFileName);
         await using var destination = File.Create(destinationPath);
