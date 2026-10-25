@@ -25,7 +25,7 @@
                         Text="Reset view"
                         Clicked="OnResetViewClicked" />
                 <Label Grid.Column="3"
-                       Text="Drag to rotate · two-finger drag to move · pinch or use +/− to zoom · tap a bone"
+                       Text="Drag to orbit around view center · two-finger drag to move · pinch or use +/− to zoom · tap a bone"
                        VerticalOptions="Center"
                        HorizontalTextAlignment="End"
                        LineBreakMode="WordWrap" />

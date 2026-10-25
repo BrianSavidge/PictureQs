@@ -206,25 +206,52 @@ window.finishModelLoading = () => {
 let downPointer = null;
 let downPosition = null;
 let canTap = false;
+let focusOnDrag = false;
+let dragPivotSelected = false;
+
+function selectViewCenterAsOrbitPivot() {
+  if (!modelRoot) return;
+  raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+  const intersections = raycaster.intersectObject(modelRoot, true);
+  if (!intersections.length) return;
+
+  const nextTarget = intersections[0].point;
+  const targetOffset = nextTarget.clone().sub(controls.target);
+  camera.position.add(targetOffset);
+  controls.target.copy(nextTarget);
+  controls.update();
+}
+
 renderer.domElement.addEventListener("pointerdown", event => {
   if (event.button !== 0) return;
   if (downPointer !== null) {
     canTap = false;
+    focusOnDrag = false;
     return;
   }
   downPointer = event.pointerId;
   downPosition = { x: event.clientX, y: event.clientY };
   canTap = true;
+  focusOnDrag = true;
+  dragPivotSelected = false;
 });
 renderer.domElement.addEventListener("pointermove", event => {
   if (event.pointerId !== downPointer || !downPosition) return;
   const dx = event.clientX - downPosition.x;
   const dy = event.clientY - downPosition.y;
-  if ((dx * dx) + (dy * dy) > 36) canTap = false;
+  if ((dx * dx) + (dy * dy) > 36) {
+    if (focusOnDrag && !dragPivotSelected) {
+      selectViewCenterAsOrbitPivot();
+      dragPivotSelected = true;
+    }
+    canTap = false;
+  }
 });
 renderer.domElement.addEventListener("pointerup", event => {
   const wasTap = canTap && event.pointerId === downPointer;
   canTap = false;
+  focusOnDrag = false;
+  dragPivotSelected = false;
   downPointer = null;
   downPosition = null;
   if (!wasTap || !modelRoot) return;
@@ -239,6 +266,8 @@ renderer.domElement.addEventListener("pointerup", event => {
 });
 renderer.domElement.addEventListener("pointercancel", () => {
   canTap = false;
+  focusOnDrag = false;
+  dragPivotSelected = false;
   downPointer = null;
   downPosition = null;
 });
