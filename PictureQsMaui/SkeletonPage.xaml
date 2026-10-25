@@ -25,7 +25,7 @@
                         Text="Reset view"
                         Clicked="OnResetViewClicked" />
                 <Label Grid.Column="3"
-                       Text="Drag to rotate · pinch or use +/− to zoom · tap a bone"
+                       Text="Drag to rotate · two-finger drag to move · pinch or use +/− to zoom · tap a bone"
                        VerticalOptions="Center"
                        HorizontalTextAlignment="End"
                        LineBreakMode="WordWrap" />
@@ -37,11 +37,16 @@
                     Padding="6">
                 <Grid x:Name="SkeletonViewport"
                       BackgroundColor="#101820">
-                    <GraphicsView x:Name="SkeletonCanvas"
-                                  InputTransparent="True" />
-                    <Grid x:Name="GestureSurface"
-                          BackgroundColor="Transparent">
-                    </Grid>
+                    <WebView x:Name="SkeletonWebView"
+                             Navigating="OnSkeletonWebViewNavigating" />
+                    <Label x:Name="LoadingLabel"
+                           Text="Loading skeleton..."
+                           TextColor="White"
+                           BackgroundColor="#C0101820"
+                           HorizontalOptions="Center"
+                           VerticalOptions="Center"
+                           Padding="16"
+                           InputTransparent="True" />
                 </Grid>
             </Border>
         </Grid>

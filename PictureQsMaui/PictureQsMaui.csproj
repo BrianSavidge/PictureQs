@@ -49,6 +49,7 @@
 		<MauiAsset Include="..\picture.png" LogicalName="picture.png" />
 		<MauiAsset Include="picture-Blanked.png" LogicalName="picture-Blanked.png" />
 		<MauiAsset Include="poi.json" LogicalName="poi.json" />
+		<MauiAsset Include="Skeleton\male_skeleton.glb" LogicalName="Skeleton/male_skeleton.glb" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -67,6 +68,7 @@
 
 		<!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
 		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
+		<MauiAsset Remove="Resources\Raw\Skeleton\viewer.js;Resources\Raw\Skeleton\build-viewer.ps1;Resources\Raw\Skeleton\build\**\*;Resources\Raw\Skeleton\examples\**\*" />
 	</ItemGroup>
 
 	<ItemGroup>
