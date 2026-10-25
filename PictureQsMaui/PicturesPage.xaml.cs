@@ -48,13 +48,15 @@ public partial class PicturesPage : ContentPage
     {
         const double buttonSpacing = 8;
         var addPictureWidth = MeasureButtonWidth(AddPictureButton, "Add picture");
+        var skeletonWidth = MeasureButtonWidth(SkeletonButton, "Skeleton");
         var backupWidth = MeasureButtonWidth(BackupButton, "Backup");
         var restoreWidth = MeasureButtonWidth(RestoreButton, "Restore");
-        var pictureActionsWidth = addPictureWidth + backupWidth + restoreWidth + buttonSpacing * 2;
+        var pictureActionsWidth = addPictureWidth + skeletonWidth + backupWidth + restoreWidth + buttonSpacing * 3;
         var dialogActionsWidth = DialogActions.Measure(double.PositiveInfinity, double.PositiveInfinity).Width;
         var groupsWouldOverlap = pictureActionsWidth + dialogActionsWidth + FooterLayout.ColumnSpacing > FooterLayout.Width;
 
         AddPictureButton.Text = groupsWouldOverlap ? "Add" : "Add picture";
+        SkeletonButton.Text = groupsWouldOverlap ? "Skel" : "Skeleton";
         BackupButton.Text = groupsWouldOverlap ? "Bak" : "Backup";
         RestoreButton.Text = groupsWouldOverlap ? "Res" : "Restore";
     }
@@ -66,6 +68,11 @@ public partial class PicturesPage : ContentPage
         var width = button.Measure(double.PositiveInfinity, double.PositiveInfinity).Width;
         button.Text = originalText;
         return width;
+    }
+
+    private async void OnSkeletonClicked(object? sender, EventArgs e)
+    {
+        await Navigation.PushAsync(new SkeletonPage());
     }
 
     private async void OnBackupClicked(object? sender, EventArgs e)

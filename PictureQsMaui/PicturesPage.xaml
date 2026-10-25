@@ -46,6 +46,9 @@
                 <Button x:Name="AddPictureButton"
                         Text="Add picture"
                         Clicked="OnAddPictureClicked" />
+                <Button x:Name="SkeletonButton"
+                        Text="Skeleton"
+                        Clicked="OnSkeletonClicked" />
                 <Button x:Name="BackupButton"
                         Text="Backup"
                         Clicked="OnBackupClicked" />
