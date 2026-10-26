@@ -49,7 +49,7 @@
 		<MauiAsset Include="..\picture.png" LogicalName="picture.png" />
 		<MauiAsset Include="picture-Blanked.png" LogicalName="picture-Blanked.png" />
 		<MauiAsset Include="poi.json" LogicalName="poi.json" />
-		<MauiAsset Include="Skeleton\male_skeleton.glb" LogicalName="Skeleton/male_skeleton.glb" />
+		<MauiAsset Include="Skeleton\Human skeleton HD.glb" LogicalName="Skeleton/Human skeleton HD.glb" />
 	</ItemGroup>
 
 	<ItemGroup>

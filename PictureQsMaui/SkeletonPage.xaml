@@ -4,52 +4,30 @@
              x:Class="PictureQsMaui.SkeletonPage"
              x:Name="PageRoot"
              Shell.NavBarIsVisible="False"
+             NavigationPage.HasNavigationBar="False"
              Title="Skeleton">
 
     <Grid Padding="12"
           ColumnDefinitions="*,260"
           ColumnSpacing="12">
-        <Grid Grid.Column="0"
-              RowDefinitions="Auto,*"
-              RowSpacing="8">
-            <Grid ColumnDefinitions="Auto,Auto,Auto,*"
-                  ColumnSpacing="8">
-                <Button Text="−"
-                        WidthRequest="48"
-                        Clicked="OnZoomOutClicked" />
-                <Button Grid.Column="1"
-                        Text="+"
-                        WidthRequest="48"
-                        Clicked="OnZoomInClicked" />
-                <Button Grid.Column="2"
-                        Text="Reset view"
-                        Clicked="OnResetViewClicked" />
-                <Label Grid.Column="3"
-                       Text="Drag to orbit around view center · two-finger drag to move · pinch or use +/− to zoom · tap a bone"
+        <Border Grid.Column="0"
+                Stroke="#D0D0D0"
+                StrokeThickness="1"
+                Padding="6">
+            <Grid x:Name="SkeletonViewport"
+                  BackgroundColor="#101820">
+                <WebView x:Name="SkeletonWebView"
+                         Navigating="OnSkeletonWebViewNavigating" />
+                <Label x:Name="LoadingLabel"
+                       Text="Loading skeleton..."
+                       TextColor="White"
+                       BackgroundColor="#C0101820"
+                       HorizontalOptions="Center"
                        VerticalOptions="Center"
-                       HorizontalTextAlignment="End"
-                       LineBreakMode="WordWrap" />
+                       Padding="16"
+                       InputTransparent="True" />
             </Grid>
-
-            <Border Grid.Row="1"
-                    Stroke="#D0D0D0"
-                    StrokeThickness="1"
-                    Padding="6">
-                <Grid x:Name="SkeletonViewport"
-                      BackgroundColor="#101820">
-                    <WebView x:Name="SkeletonWebView"
-                             Navigating="OnSkeletonWebViewNavigating" />
-                    <Label x:Name="LoadingLabel"
-                           Text="Loading skeleton..."
-                           TextColor="White"
-                           BackgroundColor="#C0101820"
-                           HorizontalOptions="Center"
-                           VerticalOptions="Center"
-                           Padding="16"
-                           InputTransparent="True" />
-                </Grid>
-            </Border>
-        </Grid>
+        </Border>
 
         <Grid Grid.Column="1"
               RowDefinitions="Auto,*,Auto"

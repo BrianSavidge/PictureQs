@@ -104,7 +104,7 @@ public partial class SkeletonPage : ContentPage
     {
         try
         {
-            await using var modelStream = await FileSystem.OpenAppPackageFileAsync("Skeleton/male_skeleton.glb");
+            await using var modelStream = await FileSystem.OpenAppPackageFileAsync("Skeleton/Human skeleton HD.glb");
             using var modelBuffer = new MemoryStream();
             await modelStream.CopyToAsync(modelBuffer);
             var modelBytes = modelBuffer.ToArray();
@@ -358,21 +358,6 @@ public partial class SkeletonPage : ContentPage
     private async void OnPicturesClicked(object? sender, EventArgs e)
     {
         await Navigation.PopAsync();
-    }
-
-    private async void OnZoomInClicked(object? sender, EventArgs e)
-    {
-        await SkeletonWebView.EvaluateJavaScriptAsync("window.zoomModel(1.25)");
-    }
-
-    private async void OnZoomOutClicked(object? sender, EventArgs e)
-    {
-        await SkeletonWebView.EvaluateJavaScriptAsync("window.zoomModel(0.8)");
-    }
-
-    private async void OnResetViewClicked(object? sender, EventArgs e)
-    {
-        await SkeletonWebView.EvaluateJavaScriptAsync("window.resetView()");
     }
 
     private static float Distance(SkeletonPointOfInterest poi, Vector3 point)

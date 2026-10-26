@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "./examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "./examples/jsm/loaders/GLTFLoader.js";
+import { MeshoptDecoder } from "./examples/jsm/libs/meshopt_decoder.module.js";
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color("#101820");
@@ -29,7 +30,7 @@ const keyLight = new THREE.DirectionalLight(0xfff3df, 3.1);
 keyLight.position.set(-3, 6, 5);
 keyLight.castShadow = true;
 scene.add(keyLight);
-const fillLight = new THREE.DirectionalLight(0xc9dfff, 1.5);
+const fillLight = new THREE.DirectionalLight(0xc9dfff, 0.45);
 fillLight.position.set(4, 1, -4);
 scene.add(fillLight);
 
@@ -40,6 +41,7 @@ scene.add(markerGroup);
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 const loader = new GLTFLoader();
+loader.setMeshoptDecoder(MeshoptDecoder);
 let modelRoot;
 let poiData = [];
 let selectedIndex = -1;
