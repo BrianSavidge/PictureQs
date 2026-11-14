@@ -9,6 +9,7 @@ namespace PictureQsMaui;
 public partial class MainPage : ContentPage
 {
     private readonly List<PointOfInterest> _pointsOfInterest = new();
+    private readonly List<PoiShapePoint> _pendingPoiShapePoints = new();
     private readonly PictureLibraryService _pictureLibrary = new();
     private readonly ArrowDrawable _arrowDrawable = new();
     private readonly PinchGestureRecognizer _pinchGesture = new();
@@ -23,6 +24,7 @@ public partial class MainPage : ContentPage
     private PointOfInterest? _editingPoi;
     private bool _isRandomMode;
     private bool _isChoosingPoiLocation;
+    private bool _isDrawingPoiShape;
     private bool _isUpdatingPoiList;
     private bool _reloadPictureAfterPicturesPage;
     private int _imagePixelWidth;
@@ -33,10 +35,12 @@ public partial class MainPage : ContentPage
     private double _pinchStartZoom = MinZoom;
 
     public ICommand DeletePoiCommand { get; }
+    public ICommand EditPoiCommand { get; }
 
     public MainPage()
     {
         DeletePoiCommand = new Command<PointOfInterest>(async poi => await DeletePoiAsync(poi));
+        EditPoiCommand = new Command<PointOfInterest>(OpenPoiEditor);
         InitializeComponent();
         MarkerOverlay.Drawable = _arrowDrawable;
         _pinchGesture.PinchUpdated += OnPicturePinched;
@@ -468,6 +472,20 @@ public partial class MainPage : ContentPage
             return;
         }
 
+        if (_isDrawingPoiShape && _editingPoi is not null)
+        {
+            _pendingPoiShapePoints.Add(new PoiShapePoint
+            {
+                XPercent = Math.Clamp(xPercent, 0, 1),
+                YPercent = Math.Clamp(yPercent, 0, 1)
+            });
+            _arrowDrawable.PreviewShapePoints = _pendingPoiShapePoints;
+            LocationStatusLabel.Text = $"{_pendingPoiShapePoints.Count} point(s) selected.";
+            LocationStatusLabel.IsVisible = true;
+            MarkerOverlay.Invalidate();
+            return;
+        }
+
         if (_isRandomMode)
         {
             if (_randomPoi is null)
@@ -524,6 +542,7 @@ public partial class MainPage : ContentPage
         {
             _editingPoi = null;
             _isChoosingPoiLocation = false;
+            CancelPoiShapeDrawing();
             PoiEditPanel.IsVisible = false;
             PoiListPanel.IsVisible = true;
         }
@@ -544,19 +563,30 @@ public partial class MainPage : ContentPage
     {
         if (sender is BindableObject { BindingContext: PointOfInterest poi })
         {
-            _isRandomMode = false;
-            _randomPoi = null;
-            ViewModeButton.Text = "Quiz Mode";
-            RandomButton.IsVisible = false;
-            _editingPoi = poi;
-            _isChoosingPoiLocation = false;
-            LocationStatusLabel.IsVisible = false;
-            SelectPoi(poi);
-            UpdatePoiList();
-            EditingPoiNameLabel.Text = poi.Text;
-            PoiListPanel.IsVisible = false;
-            PoiEditPanel.IsVisible = true;
+            OpenPoiEditor(poi);
         }
+    }
+
+    private void OpenPoiEditor(PointOfInterest? poi)
+    {
+        if (poi is null)
+        {
+            return;
+        }
+
+        _isRandomMode = false;
+        _randomPoi = null;
+        ViewModeButton.Text = "Quiz Mode";
+        RandomButton.IsVisible = false;
+        _editingPoi = poi;
+        _isChoosingPoiLocation = false;
+        CancelPoiShapeDrawing();
+        LocationStatusLabel.IsVisible = false;
+        SelectPoi(poi);
+        UpdatePoiList();
+        EditingPoiNameLabel.Text = poi.Text;
+        PoiListPanel.IsVisible = false;
+        PoiEditPanel.IsVisible = true;
     }
 
     private async void OnRenamePoiClicked(object? sender, EventArgs e)
@@ -588,9 +618,138 @@ public partial class MainPage : ContentPage
             return;
         }
 
+        CancelPoiShapeDrawing();
         _isChoosingPoiLocation = true;
         LocationStatusLabel.Text = "Tap the picture to set the new location.";
         LocationStatusLabel.IsVisible = true;
+    }
+
+    private void OnDrawShapeClicked(object? sender, EventArgs e)
+    {
+        if (_isDrawingPoiShape)
+        {
+            CancelPoiShapeDrawing();
+            LocationStatusLabel.Text = "Drawing canceled.";
+            LocationStatusLabel.IsVisible = true;
+            return;
+        }
+
+        if (_editingPoi is null)
+        {
+            return;
+        }
+
+        _isChoosingPoiLocation = false;
+        _pendingPoiShapePoints.Clear();
+        _isDrawingPoiShape = true;
+        _arrowDrawable.PreviewShapePoints = _pendingPoiShapePoints;
+        PoiStandardActions.IsVisible = false;
+        ShapeEditingActions.IsVisible = true;
+        ShapeEditingFooter.IsVisible = true;
+        ReturnToPoiListButton.IsVisible = false;
+        LocationStatusLabel.Text = "Tap the picture to add points, then end the line or complete the area.";
+        LocationStatusLabel.IsVisible = true;
+        MarkerOverlay.Invalidate();
+    }
+
+    private async void OnEndLineClicked(object? sender, EventArgs e)
+    {
+        await SavePendingPoiShapeAsync(isArea: false);
+    }
+
+    private async void OnCompleteAreaClicked(object? sender, EventArgs e)
+    {
+        await SavePendingPoiShapeAsync(isArea: true);
+    }
+
+    private async Task SavePendingPoiShapeAsync(bool isArea)
+    {
+        var minimumPoints = isArea ? 3 : 2;
+        if (_editingPoi is null || _pendingPoiShapePoints.Count < minimumPoints)
+        {
+            await DisplayAlertAsync(
+                isArea ? "Complete area" : "End line",
+                $"Select at least {minimumPoints} points first.",
+                "OK");
+            return;
+        }
+
+        _editingPoi.Shapes.Add(new PoiShape
+        {
+            Points = _pendingPoiShapePoints
+                .Select(point => new PoiShapePoint
+                {
+                    XPercent = point.XPercent,
+                    YPercent = point.YPercent
+                })
+                .ToList(),
+            IsArea = isArea
+        });
+        SavePointsOfInterest();
+        _pendingPoiShapePoints.Clear();
+        _arrowDrawable.PreviewShapePoints = _pendingPoiShapePoints;
+        LocationStatusLabel.Text = isArea ? "Area saved." : "Line saved.";
+        LocationStatusLabel.IsVisible = true;
+        UpdateSelectedPoiMarker();
+    }
+
+    private async void OnClearAllPoiShapesClicked(object? sender, EventArgs e)
+    {
+        if (_editingPoi is null)
+        {
+            return;
+        }
+
+        var shouldClear = await DisplayAlertAsync(
+            "Clear lines and areas",
+            $"Clear all lines and areas for '{_editingPoi.Text}'?",
+            "Clear",
+            "Cancel");
+        if (!shouldClear)
+        {
+            return;
+        }
+
+        _editingPoi.Shapes.Clear();
+        _pendingPoiShapePoints.Clear();
+        _arrowDrawable.PreviewShapePoints = _pendingPoiShapePoints;
+        SavePointsOfInterest();
+        LocationStatusLabel.Text = "All lines and areas cleared.";
+        LocationStatusLabel.IsVisible = true;
+        UpdateSelectedPoiMarker();
+    }
+
+    private async void OnFinishShapeEditingClicked(object? sender, EventArgs e)
+    {
+        var hadUnfinishedPoints = _pendingPoiShapePoints.Count > 0;
+        if (hadUnfinishedPoints)
+        {
+            var shouldAbandon = await DisplayAlertAsync(
+                "Abandon unfinished line or area?",
+                "You have points in an unfinished line or area. Do you want to abandon adding it and finish editing?",
+                "Abandon",
+                "Continue editing");
+            if (!shouldAbandon)
+            {
+                return;
+            }
+        }
+
+        CancelPoiShapeDrawing();
+        LocationStatusLabel.Text = "Finished editing lines and areas.";
+        LocationStatusLabel.IsVisible = true;
+    }
+
+    private void CancelPoiShapeDrawing()
+    {
+        _isDrawingPoiShape = false;
+        _pendingPoiShapePoints.Clear();
+        _arrowDrawable.PreviewShapePoints = null;
+        PoiStandardActions.IsVisible = true;
+        ShapeEditingActions.IsVisible = false;
+        ShapeEditingFooter.IsVisible = false;
+        ReturnToPoiListButton.IsVisible = true;
+        MarkerOverlay.Invalidate();
     }
 
     private async void OnEditDeletePoiClicked(object? sender, EventArgs e)
@@ -602,6 +761,7 @@ public partial class MainPage : ContentPage
     {
         _editingPoi = null;
         _isChoosingPoiLocation = false;
+        CancelPoiShapeDrawing();
         LocationStatusLabel.IsVisible = false;
         PoiEditPanel.IsVisible = false;
         PoiListPanel.IsVisible = true;
@@ -691,6 +851,7 @@ public class ArrowDrawable : IDrawable
     public Rect ImageRect { get; set; }
     public PointF? GuessPosition { get; set; }
     public bool IsFlashing { get; set; }
+    public IReadOnlyList<PoiShapePoint>? PreviewShapePoints { get; set; }
 
     public void Draw(ICanvas canvas, RectF dirtyRect)
     {
@@ -715,12 +876,53 @@ public class ArrowDrawable : IDrawable
             return;
         }
 
+        foreach (var shape in SelectedPoi.Shapes)
+        {
+            DrawShape(canvas, shape.Points, shape.IsArea);
+        }
+
+        if (PreviewShapePoints is { Count: >= 2 })
+        {
+            DrawShape(canvas, PreviewShapePoints, isArea: false);
+        }
+
         var x = ImageRect.Left + (SelectedPoi.XPercent * ImageRect.Width);
         var y = ImageRect.Top + ((1 - SelectedPoi.YPercent) * ImageRect.Height);
         var lineWidth = IsFlashing ? 8 : 6;
         var correctLocationColor = GuessPosition is null ? Colors.Red : Colors.Green;
         var strokeColor = IsFlashing ? correctLocationColor.WithAlpha(0.2f) : correctLocationColor;
         DrawMarker(canvas, x, y, strokeColor, lineWidth, 56);
+    }
+
+    private void DrawShape(ICanvas canvas, IReadOnlyList<PoiShapePoint> points, bool isArea)
+    {
+        if (points.Count < (isArea ? 3 : 2))
+        {
+            return;
+        }
+
+        var path = new PathF();
+        path.MoveTo(
+            (float)(ImageRect.Left + (points[0].XPercent * ImageRect.Width)),
+            (float)(ImageRect.Top + ((1 - points[0].YPercent) * ImageRect.Height)));
+        for (var index = 1; index < points.Count; index++)
+        {
+            path.LineTo(
+                (float)(ImageRect.Left + (points[index].XPercent * ImageRect.Width)),
+                (float)(ImageRect.Top + ((1 - points[index].YPercent) * ImageRect.Height)));
+        }
+
+        if (isArea)
+        {
+            path.Close();
+            canvas.FillColor = Colors.Blue.WithAlpha(0.1f);
+            canvas.FillPath(path);
+        }
+
+        canvas.StrokeColor = Colors.Blue.WithAlpha(0.8f);
+        canvas.StrokeSize = 3;
+        canvas.StrokeLineCap = LineCap.Round;
+        canvas.DrawPath(path);
     }
 
     private void DrawMarker(ICanvas canvas, double x, double y, Color color, double lineWidth, double arrowHeight)

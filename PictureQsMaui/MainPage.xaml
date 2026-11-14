@@ -59,9 +59,9 @@
                             <SwipeView>
                                 <SwipeView.RightItems>
                                     <SwipeItems Mode="Reveal">
-                                        <SwipeItem Text="Delete"
-                                                   BackgroundColor="DarkRed"
-                                                   Command="{Binding Source={x:Reference PageRoot}, Path=DeletePoiCommand}"
+                                        <SwipeItem Text="Edit"
+                                                   BackgroundColor="DarkSlateBlue"
+                                                   Command="{Binding Source={x:Reference PageRoot}, Path=EditPoiCommand}"
                                                    CommandParameter="{Binding .}" />
                                     </SwipeItems>
                                 </SwipeView.RightItems>
@@ -104,7 +104,7 @@
 
             <Grid x:Name="PoiEditPanel"
                   IsVisible="False"
-                  RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*"
+                  RowDefinitions="Auto,Auto,Auto,Auto,Auto,*"
                   RowSpacing="12">
                 <Label Text="Point of interest"
                        FontAttributes="Bold"
@@ -113,25 +113,50 @@
                        Grid.Row="1"
                        FontSize="16"
                        LineBreakMode="WordWrap" />
-                <Button Grid.Row="2"
-                        Text="Rename"
-                        Clicked="OnRenamePoiClicked" />
-                <Button Grid.Row="3"
-                        Text="Choose new location"
-                        Clicked="OnChoosePoiLocationClicked" />
-                <Button Grid.Row="4"
-                        Text="Delete point of interest"
-                        TextColor="White"
-                        BackgroundColor="DarkRed"
-                        Clicked="OnEditDeletePoiClicked" />
+                <VerticalStackLayout x:Name="PoiStandardActions"
+                                     Grid.Row="2"
+                                     Spacing="8">
+                    <Button Text="Rename"
+                            Clicked="OnRenamePoiClicked" />
+                    <Button Text="Choose new location"
+                            Clicked="OnChoosePoiLocationClicked" />
+                    <Button Text="Edit lines and areas"
+                            Clicked="OnDrawShapeClicked" />
+                    <Button Text="Delete point of interest"
+                            TextColor="White"
+                            BackgroundColor="DarkRed"
+                            Clicked="OnEditDeletePoiClicked" />
+                </VerticalStackLayout>
+                <VerticalStackLayout x:Name="ShapeEditingActions"
+                                     Grid.Row="3"
+                                     IsVisible="False"
+                                     Spacing="8">
+                    <Button x:Name="EndLineButton"
+                            Text="End line"
+                            Clicked="OnEndLineClicked" />
+                    <Button x:Name="CompleteAreaButton"
+                            Text="Complete area"
+                            Clicked="OnCompleteAreaClicked" />
+                </VerticalStackLayout>
                 <Label x:Name="LocationStatusLabel"
-                       Grid.Row="5"
+                       Grid.Row="4"
                        IsVisible="False"
                        TextColor="Gray" />
-                <Button Grid.Row="6"
+                <Button x:Name="ReturnToPoiListButton"
+                        Grid.Row="5"
                         VerticalOptions="End"
                         Text="Return to points of interest"
                         Clicked="OnReturnToPoiListClicked" />
+                <VerticalStackLayout x:Name="ShapeEditingFooter"
+                                     Grid.Row="5"
+                                     IsVisible="False"
+                                     VerticalOptions="End"
+                                     Spacing="8">
+                    <Button Text="Clear all lines and areas"
+                            Clicked="OnClearAllPoiShapesClicked" />
+                    <Button Text="Finished editing lines and areas"
+                            Clicked="OnFinishShapeEditingClicked" />
+                </VerticalStackLayout>
             </Grid>
         </Grid>
     </Grid>
