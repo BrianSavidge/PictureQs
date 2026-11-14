@@ -172,6 +172,10 @@ try {
     Copy-Item -LiteralPath $bundles[0].FullName -Destination $artifactPath -Force
     Write-Host "Google Play bundle created: $artifactPath"
     Write-Host "Use a version code greater than the one currently published on Google Play."
+    $resolvedArtifactPath = (Resolve-Path -LiteralPath $artifactPath -ErrorAction Stop).Path
+    Start-Process -FilePath (Join-Path $env:WINDIR "explorer.exe") `
+        -ArgumentList "/select,`"$resolvedArtifactPath`"" `
+        -ErrorAction Stop
 }
 finally {
     if ($hadPreviousStorePassword) {
