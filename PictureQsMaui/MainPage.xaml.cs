@@ -20,7 +20,9 @@ public partial class MainPage : ContentPage
     private string _activePictureFileName = "picture.png";
     private PointOfInterest? _randomPoi;
     private PointOfInterest? _selectedPoi;
+    private PointOfInterest? _editingPoi;
     private bool _isRandomMode;
+    private bool _isChoosingPoiLocation;
     private bool _isUpdatingPoiList;
     private bool _reloadPictureAfterPicturesPage;
     private int _imagePixelWidth;
@@ -454,6 +456,18 @@ public partial class MainPage : ContentPage
             return;
         }
 
+        if (_isChoosingPoiLocation && _editingPoi is not null)
+        {
+            _editingPoi.XPercent = Math.Clamp(xPercent, 0, 1);
+            _editingPoi.YPercent = Math.Clamp(yPercent, 0, 1);
+            _isChoosingPoiLocation = false;
+            SavePointsOfInterest();
+            SelectPoi(_editingPoi);
+            LocationStatusLabel.Text = "Location updated.";
+            LocationStatusLabel.IsVisible = true;
+            return;
+        }
+
         if (_isRandomMode)
         {
             if (_randomPoi is null)
@@ -506,6 +520,14 @@ public partial class MainPage : ContentPage
 
         _pointsOfInterest.Remove(poiToRemove);
         SavePointsOfInterest();
+        if (_editingPoi == poiToRemove)
+        {
+            _editingPoi = null;
+            _isChoosingPoiLocation = false;
+            PoiEditPanel.IsVisible = false;
+            PoiListPanel.IsVisible = true;
+        }
+
         _selectedPoi = null;
         _arrowDrawable.SelectedPoi = null;
         _arrowDrawable.GuessPosition = null;
@@ -518,12 +540,71 @@ public partial class MainPage : ContentPage
         UpdatePoiList();
     }
 
-    private async void OnPoiDoubleTapped(object? sender, TappedEventArgs e)
+    private void OnPoiDoubleTapped(object? sender, TappedEventArgs e)
     {
         if (sender is BindableObject { BindingContext: PointOfInterest poi })
         {
-            await DeletePoiAsync(poi);
+            _isRandomMode = false;
+            _randomPoi = null;
+            ViewModeButton.Text = "Quiz Mode";
+            RandomButton.IsVisible = false;
+            _editingPoi = poi;
+            _isChoosingPoiLocation = false;
+            LocationStatusLabel.IsVisible = false;
+            SelectPoi(poi);
+            UpdatePoiList();
+            EditingPoiNameLabel.Text = poi.Text;
+            PoiListPanel.IsVisible = false;
+            PoiEditPanel.IsVisible = true;
         }
+    }
+
+    private async void OnRenamePoiClicked(object? sender, EventArgs e)
+    {
+        if (_editingPoi is null)
+        {
+            return;
+        }
+
+        var newName = await DisplayPromptAsync(
+            "Rename point of interest",
+            "Description",
+            initialValue: _editingPoi.Text);
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            return;
+        }
+
+        _editingPoi.Text = newName.Trim();
+        SavePointsOfInterest();
+        EditingPoiNameLabel.Text = _editingPoi.Text;
+        UpdatePoiList();
+    }
+
+    private void OnChoosePoiLocationClicked(object? sender, EventArgs e)
+    {
+        if (_editingPoi is null)
+        {
+            return;
+        }
+
+        _isChoosingPoiLocation = true;
+        LocationStatusLabel.Text = "Tap the picture to set the new location.";
+        LocationStatusLabel.IsVisible = true;
+    }
+
+    private async void OnEditDeletePoiClicked(object? sender, EventArgs e)
+    {
+        await DeletePoiAsync(_editingPoi);
+    }
+
+    private void OnReturnToPoiListClicked(object? sender, EventArgs e)
+    {
+        _editingPoi = null;
+        _isChoosingPoiLocation = false;
+        LocationStatusLabel.IsVisible = false;
+        PoiEditPanel.IsVisible = false;
+        PoiListPanel.IsVisible = true;
     }
 
     private void OnPoiSelected(object? sender, SelectionChangedEventArgs e)
