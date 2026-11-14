@@ -100,6 +100,7 @@
                                 Clicked="OnPicturesClicked" />
                     </Grid>
                 </Grid>
+
             </Grid>
 
             <Grid x:Name="PoiEditPanel"
@@ -131,12 +132,17 @@
                                      Grid.Row="3"
                                      IsVisible="False"
                                      Spacing="8">
-                    <Button x:Name="EndLineButton"
-                            Text="End line"
-                            Clicked="OnEndLineClicked" />
-                    <Button x:Name="CompleteAreaButton"
-                            Text="Complete area"
-                            Clicked="OnCompleteAreaClicked" />
+                    <VerticalStackLayout Spacing="8">
+                        <Button x:Name="EndLineButton"
+                                Text="End line"
+                                Clicked="OnEndLineClicked" />
+                        <Button x:Name="CompleteAreaButton"
+                                Text="Complete area"
+                                Clicked="OnCompleteAreaClicked" />
+                        <Button
+                                Text="Clear points"
+                                Clicked="OnClearPendingPoiShapePointsClicked" />
+                    </VerticalStackLayout>
                 </VerticalStackLayout>
                 <Label x:Name="LocationStatusLabel"
                        Grid.Row="4"
@@ -152,12 +158,41 @@
                                      IsVisible="False"
                                      VerticalOptions="End"
                                      Spacing="8">
+                    <Button x:Name="DeletePoiShapeButton"
+                            Text="Delete a line or area"
+                            Clicked="OnDeletePoiShapeClicked" />
                     <Button Text="Clear all lines and areas"
                             Clicked="OnClearAllPoiShapesClicked" />
                     <Button Text="Finished editing lines and areas"
                             Clicked="OnFinishShapeEditingClicked" />
                 </VerticalStackLayout>
             </Grid>
+        </Grid>
+
+        <Grid x:Name="DeleteShapeConfirmationOverlay"
+              Grid.ColumnSpan="2"
+              IsVisible="False"
+              BackgroundColor="#66000000">
+            <Border Margin="12"
+                    Padding="16"
+                    VerticalOptions="End"
+                    BackgroundColor="White"
+                    Stroke="#D0D0D0">
+                <VerticalStackLayout Spacing="12">
+                    <Label x:Name="DeleteShapeConfirmationMessage"
+                           FontSize="16"
+                           TextColor="Black" />
+                    <HorizontalStackLayout Spacing="8"
+                                           HorizontalOptions="End">
+                        <Button Text="Keep"
+                                Clicked="OnKeepPoiShapeClicked" />
+                        <Button Text="Delete"
+                                TextColor="White"
+                                BackgroundColor="DarkRed"
+                                Clicked="OnConfirmDeletePoiShapeClicked" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Border>
         </Grid>
     </Grid>
 

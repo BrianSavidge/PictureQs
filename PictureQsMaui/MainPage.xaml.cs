@@ -22,9 +22,11 @@ public partial class MainPage : ContentPage
     private PointOfInterest? _randomPoi;
     private PointOfInterest? _selectedPoi;
     private PointOfInterest? _editingPoi;
+    private PoiShape? _shapeAwaitingDeleteConfirmation;
     private bool _isRandomMode;
     private bool _isChoosingPoiLocation;
     private bool _isDrawingPoiShape;
+    private bool _isSelectingPoiShapeToDelete;
     private bool _isUpdatingPoiList;
     private bool _reloadPictureAfterPicturesPage;
     private int _imagePixelWidth;
@@ -472,6 +474,12 @@ public partial class MainPage : ContentPage
             return;
         }
 
+        if (_isSelectingPoiShapeToDelete && _editingPoi is not null)
+        {
+            await ConfirmDeleteNearestPoiShapeAsync(xPercent, yPercent);
+            return;
+        }
+
         if (_isDrawingPoiShape && _editingPoi is not null)
         {
             _pendingPoiShapePoints.Add(new PoiShapePoint
@@ -662,6 +670,211 @@ public partial class MainPage : ContentPage
         await SavePendingPoiShapeAsync(isArea: true);
     }
 
+    private void OnClearPendingPoiShapePointsClicked(object? sender, EventArgs e)
+    {
+        _pendingPoiShapePoints.Clear();
+        _arrowDrawable.PreviewShapePoints = _pendingPoiShapePoints;
+        LocationStatusLabel.Text = "Current points cleared.";
+        LocationStatusLabel.IsVisible = true;
+        MarkerOverlay.Invalidate();
+    }
+
+    private void OnDeletePoiShapeClicked(object? sender, EventArgs e)
+    {
+        if (_editingPoi is null)
+        {
+            return;
+        }
+
+        _isSelectingPoiShapeToDelete = !_isSelectingPoiShapeToDelete;
+        DeletePoiShapeButton.Text = _isSelectingPoiShapeToDelete
+            ? "Cancel shape selection"
+            : "Delete a line or area";
+        LocationStatusLabel.Text = _isSelectingPoiShapeToDelete
+            ? "Tap near a line or area to select it for deletion."
+            : "Shape selection canceled.";
+        LocationStatusLabel.IsVisible = true;
+    }
+
+    private Task ConfirmDeleteNearestPoiShapeAsync(double xPercent, double yPercent)
+    {
+        _isSelectingPoiShapeToDelete = false;
+        DeletePoiShapeButton.Text = "Delete a line or area";
+
+        var shapes = _editingPoi?.Shapes;
+        if (shapes is null || shapes.Count == 0)
+        {
+            LocationStatusLabel.Text = "There are no saved lines or areas to delete.";
+            LocationStatusLabel.IsVisible = true;
+            return Task.CompletedTask;
+        }
+
+        var nearestShape = FindNearestPoiShape(shapes, xPercent, yPercent);
+        if (nearestShape is null)
+        {
+            LocationStatusLabel.Text = "No line or area was found near that point.";
+            LocationStatusLabel.IsVisible = true;
+            return Task.CompletedTask;
+        }
+
+        _arrowDrawable.ShapeToShowOnly = nearestShape;
+        _shapeAwaitingDeleteConfirmation = nearestShape;
+        var shapeName = nearestShape.IsArea ? "area" : "line";
+        DeleteShapeConfirmationMessage.Text = $"Delete the highlighted {shapeName}?";
+        DeleteShapeConfirmationOverlay.IsVisible = true;
+        MarkerOverlay.Invalidate();
+        return Task.CompletedTask;
+    }
+
+    private void OnConfirmDeletePoiShapeClicked(object? sender, EventArgs e)
+    {
+        var shapeToDelete = _shapeAwaitingDeleteConfirmation;
+        if (shapeToDelete is not null && _editingPoi is not null)
+        {
+            _editingPoi.Shapes.Remove(shapeToDelete);
+            SavePointsOfInterest();
+            LocationStatusLabel.Text = shapeToDelete.IsArea ? "Area deleted." : "Line deleted.";
+        }
+        else
+        {
+            LocationStatusLabel.Text = "The selected line or area is no longer available.";
+        }
+
+        ClosePoiShapeDeleteConfirmation();
+        LocationStatusLabel.IsVisible = true;
+    }
+
+    private void OnKeepPoiShapeClicked(object? sender, EventArgs e)
+    {
+        LocationStatusLabel.Text = "Line or area kept.";
+        LocationStatusLabel.IsVisible = true;
+        ClosePoiShapeDeleteConfirmation();
+    }
+
+    private void ClosePoiShapeDeleteConfirmation()
+    {
+        _shapeAwaitingDeleteConfirmation = null;
+        _arrowDrawable.ShapeToShowOnly = null;
+        DeleteShapeConfirmationOverlay.IsVisible = false;
+        MarkerOverlay.Invalidate();
+    }
+
+    private PoiShape? FindNearestPoiShape(
+        IReadOnlyList<PoiShape> shapes,
+        double xPercent,
+        double yPercent)
+    {
+        var imageWidth = _imagePixelWidth;
+        var imageHeight = _imagePixelHeight;
+        PoiShape? nearestShape = null;
+        var nearestDistanceSquared = double.PositiveInfinity;
+        foreach (var shape in shapes)
+        {
+            var minimumPointCount = shape.IsArea ? 3 : 2;
+            if (shape.Points.Count < minimumPointCount
+                || shape.Points.Any(point => !double.IsFinite(point.XPercent) || !double.IsFinite(point.YPercent)))
+            {
+                continue;
+            }
+
+            var distanceSquared = GetShapeDistanceSquared(
+                shape,
+                xPercent * imageWidth,
+                yPercent * imageHeight,
+                imageWidth,
+                imageHeight);
+            if (distanceSquared < nearestDistanceSquared)
+            {
+                nearestDistanceSquared = distanceSquared;
+                nearestShape = shape;
+            }
+        }
+
+        return nearestShape;
+    }
+
+    private static double GetShapeDistanceSquared(
+        PoiShape shape,
+        double x,
+        double y,
+        double imageWidth,
+        double imageHeight)
+    {
+        var points = shape.Points
+            .Select(point => (X: point.XPercent * imageWidth, Y: point.YPercent * imageHeight))
+            .ToList();
+        if (shape.IsArea && IsPointInsideArea(x, y, points))
+        {
+            return 0;
+        }
+
+        var distanceSquared = double.PositiveInfinity;
+        for (var index = 1; index < points.Count; index++)
+        {
+            distanceSquared = Math.Min(
+                distanceSquared,
+                GetDistanceToSegmentSquared(x, y, points[index - 1], points[index]));
+        }
+
+        if (shape.IsArea)
+        {
+            distanceSquared = Math.Min(
+                distanceSquared,
+                GetDistanceToSegmentSquared(x, y, points[^1], points[0]));
+        }
+
+        return distanceSquared;
+    }
+
+    private static bool IsPointInsideArea(
+        double x,
+        double y,
+        IReadOnlyList<(double X, double Y)> points)
+    {
+        var isInside = false;
+        for (int current = 0, previous = points.Count - 1; current < points.Count; previous = current++)
+        {
+            var currentPoint = points[current];
+            var previousPoint = points[previous];
+            var crossesY = (currentPoint.Y > y) != (previousPoint.Y > y);
+            if (crossesY
+                && x < ((previousPoint.X - currentPoint.X) * (y - currentPoint.Y)
+                    / (previousPoint.Y - currentPoint.Y)) + currentPoint.X)
+            {
+                isInside = !isInside;
+            }
+        }
+
+        return isInside;
+    }
+
+    private static double GetDistanceToSegmentSquared(
+        double x,
+        double y,
+        (double X, double Y) start,
+        (double X, double Y) end)
+    {
+        var deltaX = end.X - start.X;
+        var deltaY = end.Y - start.Y;
+        var lengthSquared = (deltaX * deltaX) + (deltaY * deltaY);
+        if (lengthSquared <= 0)
+        {
+            var pointDeltaX = x - start.X;
+            var pointDeltaY = y - start.Y;
+            return (pointDeltaX * pointDeltaX) + (pointDeltaY * pointDeltaY);
+        }
+
+        var projection = Math.Clamp(
+            (((x - start.X) * deltaX) + ((y - start.Y) * deltaY)) / lengthSquared,
+            0,
+            1);
+        var nearestX = start.X + (projection * deltaX);
+        var nearestY = start.Y + (projection * deltaY);
+        var distanceX = x - nearestX;
+        var distanceY = y - nearestY;
+        return (distanceX * distanceX) + (distanceY * distanceY);
+    }
+
     private async Task SavePendingPoiShapeAsync(bool isArea)
     {
         var minimumPoints = isArea ? 3 : 2;
@@ -743,8 +956,11 @@ public partial class MainPage : ContentPage
     private void CancelPoiShapeDrawing()
     {
         _isDrawingPoiShape = false;
+        _isSelectingPoiShapeToDelete = false;
         _pendingPoiShapePoints.Clear();
         _arrowDrawable.PreviewShapePoints = null;
+        ClosePoiShapeDeleteConfirmation();
+        DeletePoiShapeButton.Text = "Delete a line or area";
         PoiStandardActions.IsVisible = true;
         ShapeEditingActions.IsVisible = false;
         ShapeEditingFooter.IsVisible = false;
@@ -852,6 +1068,7 @@ public class ArrowDrawable : IDrawable
     public PointF? GuessPosition { get; set; }
     public bool IsFlashing { get; set; }
     public IReadOnlyList<PoiShapePoint>? PreviewShapePoints { get; set; }
+    public PoiShape? ShapeToShowOnly { get; set; }
 
     public void Draw(ICanvas canvas, RectF dirtyRect)
     {
@@ -873,6 +1090,12 @@ public class ArrowDrawable : IDrawable
 
         if (SelectedPoi is null)
         {
+            return;
+        }
+
+        if (ShapeToShowOnly is not null)
+        {
+            DrawShape(canvas, ShapeToShowOnly.Points, ShapeToShowOnly.IsArea);
             return;
         }
 

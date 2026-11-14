@@ -5,7 +5,7 @@ public sealed class SplashPage : ContentPage
     private const string AppName = "PictureQs";
     private const double TextWidthRatio = 0.95;
     private const double ArrowHeightRatio = 0.25;
-    private const double VerticalShiftRatio = 0.20;
+    private const double TitleCenterRatio = 0.65;
     private readonly HorizontalStackLayout _title;
     private readonly Label[] _letters;
     private readonly GraphicsView _arrow;
@@ -102,7 +102,7 @@ public sealed class SplashPage : ContentPage
         }
 
         var textSize = _title.Measure(layout.Width * TextWidthRatio, layout.Height);
-        var textTop = (layout.Height - textSize.Height) / 2 - layout.Height * VerticalShiftRatio;
+        var textTop = (layout.Height * TitleCenterRatio) - (textSize.Height / 2);
         var iCenterX = layout.Width * (1 - TextWidthRatio) / 2
             + _letters[0].Measure(double.PositiveInfinity, double.PositiveInfinity).Width
             + _letters[1].Measure(double.PositiveInfinity, double.PositiveInfinity).Width / 2;
